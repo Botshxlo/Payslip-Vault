@@ -23,7 +23,7 @@ export async function findPayslipEmails(): Promise<string[]> {
   const gmail = getGmail();
   const res = await gmail.users.messages.list({
     userId: "me",
-    q: "subject:payslip has:attachment is:unread",
+    q: "from:noreply-ss@simplepay.cloud subject:payslip has:attachment is:unread",
   });
   return (res.data.messages ?? []).map((m) => m.id!);
 }
