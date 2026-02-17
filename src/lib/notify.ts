@@ -42,8 +42,8 @@ export async function notifySlack({
         elements: [
           {
             type: "button",
-            text: { type: "plain_text", text: "View in Drive" },
-            url: `https://drive.google.com/file/d/${driveFileId}/view`,
+            text: { type: "plain_text", text: "View Payslip" },
+            url: `${process.env.VIEWER_BASE_URL}/view/${driveFileId}`,
           },
         ],
       },
@@ -52,7 +52,7 @@ export async function notifySlack({
         elements: [
           {
             type: "mrkdwn",
-            text: "Decrypt locally using the vault-decrypt CLI script",
+            text: "Password-protected \u00b7 Decrypted in your browser only",
           },
         ],
       },
