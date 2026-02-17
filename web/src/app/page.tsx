@@ -21,11 +21,26 @@ export default function Home() {
           decryption. Your payslips are encrypted with AES-256-GCM and can only
           be viewed with your vault password.
         </p>
+        <a
+          href="/history"
+          style={{
+            display: "inline-block",
+            marginTop: "2rem",
+            padding: "0.75rem 1.5rem",
+            fontSize: "1rem",
+            background: "#111",
+            color: "#fff",
+            borderRadius: 8,
+            textDecoration: "none",
+          }}
+        >
+          View Payslip History
+        </a>
         <p
           style={{
             color: "#999",
             fontSize: "0.875rem",
-            marginTop: "2rem",
+            marginTop: "1rem",
           }}
         >
           This is a personal tool. Payslip links are delivered via Slack.

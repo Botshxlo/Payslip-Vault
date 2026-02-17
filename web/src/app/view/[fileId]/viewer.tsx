@@ -98,7 +98,10 @@ export default function Viewer({ fileId }: { fileId: string }) {
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (state.step === "error") setState({ step: "idle" });
+              }}
               placeholder="Vault password"
               required
               disabled={state.step === "loading"}
