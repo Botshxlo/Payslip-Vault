@@ -1,0 +1,22 @@
+{
+  "name": "payslip-vault",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx trigger.dev@latest dev",
+    "deploy": "npx trigger.dev@latest deploy",
+    "decrypt": "tsx scripts/decrypt.ts"
+  },
+  "dependencies": {
+    "@googleapis/drive": "^20.1.0",
+    "@googleapis/gmail": "^16.1.1",
+    "@trigger.dev/sdk": "^4.3.3",
+    "google-auth-library": "^10.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
