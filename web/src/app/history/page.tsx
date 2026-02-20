@@ -24,21 +24,37 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-ZA", { dateStyle: "long" });
 }
 
-function formatMonthYear(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-ZA", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
 function cleanFilename(name: string): string {
   return name.replace(/_\d+\.enc$/, "");
+}
+
+const MONTHS = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
+
+function extractPayslipMonth(name: string): string | null {
+  const cleaned = cleanFilename(name).toLowerCase();
+  for (const month of MONTHS) {
+    if (cleaned.includes(month)) {
+      const yearMatch = cleaned.match(/\b(20\d{2})\b/);
+      if (yearMatch) {
+        return `${month.charAt(0).toUpperCase() + month.slice(1)} ${yearMatch[1]}`;
+      }
+    }
+  }
+  return null;
 }
 
 function groupByMonth(files: PayslipFile[]): Map<string, PayslipFile[]> {
   const groups = new Map<string, PayslipFile[]>();
   for (const file of files) {
-    const key = formatMonthYear(file.createdTime);
+    const key =
+      extractPayslipMonth(file.name) ??
+      new Date(file.createdTime).toLocaleDateString("en-ZA", {
+        month: "long",
+        year: "numeric",
+      });
     const group = groups.get(key);
     if (group) {
       group.push(file);
@@ -92,11 +108,12 @@ export default function HistoryPage() {
     if (state.step !== "ready") return [];
     if (!search.trim()) return state.files;
     const q = search.toLowerCase();
-    return state.files.filter(
-      (f) =>
-        formatDate(f.createdTime).toLowerCase().includes(q) ||
-        cleanFilename(f.name).toLowerCase().includes(q)
-    );
+    return state.files.filter((f) => {
+      const name = cleanFilename(f.name).toLowerCase();
+      const month = (extractPayslipMonth(f.name) ?? "").toLowerCase();
+      const date = formatDate(f.createdTime).toLowerCase();
+      return name.includes(q) || month.includes(q) || date.includes(q);
+    });
   }, [state, search]);
 
   const grouped = useMemo(() => groupByMonth(filtered), [filtered]);
@@ -214,10 +231,10 @@ export default function HistoryPage() {
                         <Link key={file.id} href={`/view/${file.id}`}>
                           <Card className="cursor-pointer px-5 py-4 transition-colors hover:bg-accent">
                             <div className="font-medium">
-                              {formatDate(file.createdTime)}
+                              {cleanFilename(file.name)}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {cleanFilename(file.name)}
+                              Uploaded {formatDate(file.createdTime)}
                             </div>
                           </Card>
                         </Link>
