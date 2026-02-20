@@ -1,15 +1,23 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
 
+const client = createClient({
+  url: process.env.TURSO_DATABASE_URL || "file:local.db",
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+const db = drizzle(client);
+
+import * as schema from "./auth-schema";
+
 export const auth = betterAuth({
-  database: {
-    db: createClient({
-      url: process.env.TURSO_DATABASE_URL || "file:local.db",
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    }),
-    type: "sqlite",
-  },
+  database: drizzleAdapter(db, {
+    provider: "sqlite",
+    schema,
+  }),
   emailAndPassword: {
     enabled: false,
   },
