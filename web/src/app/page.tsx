@@ -1,51 +1,54 @@
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
 export default function Home() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "2rem",
-        fontFamily: "system-ui, sans-serif",
-        background: "#fafafa",
-      }}
-    >
-      <div style={{ maxWidth: 500, textAlign: "center" }}>
-        <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
+    <div className="flex min-h-svh flex-col items-center justify-center px-6 py-12">
+      <main className="flex max-w-lg flex-col items-center text-center">
+        <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-muted-foreground"
+          >
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+
+        <h1 className="text-3xl font-semibold tracking-tight">
           Payslip Vault
         </h1>
-        <p style={{ color: "#666", fontSize: "1.1rem", lineHeight: 1.6 }}>
+        <p className="mt-3 max-w-sm text-base leading-relaxed text-muted-foreground">
           Secure, encrypted payslip storage with zero-knowledge browser
-          decryption. Your payslips are encrypted with AES-256-GCM and can only
-          be viewed with your vault password.
+          decryption. Your password never leaves your device.
         </p>
-        <a
-          href="/history"
-          style={{
-            display: "inline-block",
-            marginTop: "2rem",
-            padding: "0.75rem 1.5rem",
-            fontSize: "1rem",
-            background: "#111",
-            color: "#fff",
-            borderRadius: 8,
-            textDecoration: "none",
-          }}
-        >
-          View Payslip History
-        </a>
-        <p
-          style={{
-            color: "#999",
-            fontSize: "0.875rem",
-            marginTop: "1rem",
-          }}
-        >
+
+        <Button asChild size="lg" className="mt-8">
+          <Link href="/history">View Payslip History</Link>
+        </Button>
+
+        <p className="mt-6 text-sm text-muted-foreground/60">
           This is a personal tool. Payslip links are delivered via Slack.
         </p>
-      </div>
+      </main>
+
+      <footer className="mt-auto flex gap-4 pt-12 text-xs text-muted-foreground/50">
+        <Link href="/privacy" className="transition-colors hover:text-muted-foreground">
+          Privacy Policy
+        </Link>
+        <span>&middot;</span>
+        <Link href="/terms" className="transition-colors hover:text-muted-foreground">
+          Terms of Service
+        </Link>
+      </footer>
     </div>
   );
 }

@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PayslipFile {
   id: string;
@@ -25,7 +28,8 @@ function cleanFilename(name: string): string {
 export default function HistoryPage() {
   const [state, setState] = useState<PageState>({ step: "loading" });
 
-  useEffect(() => {
+  const loadFiles = () => {
+    setState({ step: "loading" });
     fetch("/api/files")
       .then(async (res) => {
         if (!res.ok) throw new Error(`Failed to load (${res.status})`);
@@ -38,67 +42,63 @@ export default function HistoryPage() {
           message: err instanceof Error ? err.message : "Failed to load",
         });
       });
-  }, []);
+  };
+
+  useEffect(loadFiles, []);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "2rem",
-        fontFamily: "system-ui, sans-serif",
-        background: "#fafafa",
-      }}
-    >
-      <div style={{ maxWidth: 600, width: "100%" }}>
+    <div className="flex min-h-svh flex-col items-center px-6 py-8">
+      <div className="w-full max-w-xl">
         <Link
           href="/"
-          style={{
-            color: "#666",
-            fontSize: "0.875rem",
-            textDecoration: "none",
-          }}
+          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           &larr; Back
         </Link>
-        <h1 style={{ fontSize: "1.5rem", marginTop: "0.5rem" }}>
+        <h1 className="mt-3 text-xl font-semibold tracking-tight">
           Payslip History
         </h1>
 
         {state.step === "loading" && (
-          <p style={{ color: "#666" }}>Loading payslips...</p>
+          <div className="mt-6 flex flex-col gap-3">
+            {Array.from({ length: 3 }, (_, i) => (
+              <Skeleton key={i} className="h-[72px] w-full rounded-xl" />
+            ))}
+          </div>
         )}
 
         {state.step === "error" && (
-          <p style={{ color: "#dc2626" }}>{state.message}</p>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-destructive">{state.message}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={loadFiles}
+            >
+              Retry
+            </Button>
+          </div>
         )}
 
         {state.step === "ready" && state.files.length === 0 && (
-          <p style={{ color: "#666" }}>No payslips yet.</p>
+          <p className="mt-6 text-sm text-muted-foreground">
+            No payslips yet.
+          </p>
         )}
 
         {state.step === "ready" && state.files.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div className="mt-6 flex flex-col gap-3">
             {state.files.map((file) => (
-              <Link
-                key={file.id}
-                href={`/view/${file.id}`}
-                style={{
-                  display: "block",
-                  padding: "1rem",
-                  background: "#fff",
-                  border: "1px solid #e5e5e5",
-                  borderRadius: 8,
-                  textDecoration: "none",
-                  color: "inherit",
-                }}
-              >
-                <div style={{ fontWeight: 500 }}>{formatDate(file.createdTime)}</div>
-                <div style={{ color: "#666", fontSize: "0.875rem", marginTop: "0.25rem" }}>
-                  {cleanFilename(file.name)}
-                </div>
+              <Link key={file.id} href={`/view/${file.id}`}>
+                <Card className="cursor-pointer px-5 py-4 transition-colors hover:bg-accent">
+                  <div className="font-medium">
+                    {formatDate(file.createdTime)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {cleanFilename(file.name)}
+                  </div>
+                </Card>
               </Link>
             ))}
           </div>
