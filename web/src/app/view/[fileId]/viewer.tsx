@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
@@ -37,10 +37,41 @@ function usePageWidth() {
   return Math.min(768, width - 48);
 }
 
+const AUTO_LOCK_MS = 5 * 60 * 1000; // 5 minutes
+
 export default function Viewer({ fileId }: { fileId: string }) {
   const [state, setState] = useState<ViewerState>({ step: "idle" });
   const [password, setPassword] = useState("");
   const pageWidth = usePageWidth();
+  const lockTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // Auto-lock: revoke blob URL and reset to idle after inactivity
+  const resetLockTimer = useCallback(() => {
+    if (lockTimer.current) clearTimeout(lockTimer.current);
+    lockTimer.current = setTimeout(() => {
+      setState((s) => {
+        if (s.step === "ready") {
+          URL.revokeObjectURL(s.url);
+          toast.info("Payslip locked due to inactivity.");
+          return { step: "idle" };
+        }
+        return s;
+      });
+    }, AUTO_LOCK_MS);
+  }, []);
+
+  useEffect(() => {
+    if (state.step !== "ready") return;
+
+    resetLockTimer();
+    const events = ["mousemove", "keydown", "scroll", "touchstart"] as const;
+    for (const e of events) window.addEventListener(e, resetLockTimer);
+
+    return () => {
+      if (lockTimer.current) clearTimeout(lockTimer.current);
+      for (const e of events) window.removeEventListener(e, resetLockTimer);
+    };
+  }, [state.step, resetLockTimer]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
