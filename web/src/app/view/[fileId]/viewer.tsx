@@ -164,18 +164,13 @@ export default function Viewer({ fileId }: { fileId: string }) {
 
       {state.step === "ready" && (
         <div className="w-full max-w-3xl">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4">
             <Link
               href="/history"
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               &larr; Back to history
             </Link>
-            <Button asChild variant="outline" size="sm">
-              <a href={state.url} download="payslip.pdf">
-                Download PDF
-              </a>
-            </Button>
           </div>
           <Document
             file={state.url}

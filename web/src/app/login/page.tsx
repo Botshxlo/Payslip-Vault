@@ -23,22 +23,32 @@ function LoginContent() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const result = await authClient.signIn.social({
-        provider: "google",
-        callbackURL: redirect,
+      const res = await fetch("/api/auth/sign-in/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "google",
+          callbackURL: redirect,
+        }),
       });
 
-      if (result.error) {
-        toast.error(result.error.message || "Sign in failed. Please try again.");
+      const data = await res.json();
+      console.log("[login] sign-in response:", res.status, data);
+
+      if (!res.ok) {
+        toast.error(data?.message || "Sign in failed. Please try again.");
         setLoading(false);
         return;
       }
 
-      // Manually redirect if the plugin didn't
-      if (result.data?.url) {
-        window.location.href = result.data.url;
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error("No redirect URL received from server.");
+        setLoading(false);
       }
-    } catch {
+    } catch (err) {
+      console.error("[login] sign-in error:", err);
       toast.error("Sign in failed. Please try again.");
       setLoading(false);
     }

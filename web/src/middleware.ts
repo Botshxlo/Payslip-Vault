@@ -3,9 +3,19 @@ import type { NextRequest } from "next/server";
 
 const protectedPages = ["/history", "/view"];
 const protectedAPIs = ["/api/files", "/api/file"];
+const publicOnlyPages = ["/", "/login"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const sessionCookie =
+    request.cookies.get("better-auth.session_token") ??
+    request.cookies.get("__Secure-better-auth.session_token");
+
+  // Redirect signed-in users away from public-only pages to /history
+  if (publicOnlyPages.includes(pathname) && sessionCookie) {
+    return NextResponse.redirect(new URL("/history", request.url));
+  }
 
   const isProtectedPage = protectedPages.some((r) => pathname.startsWith(r));
   const isProtectedAPI = protectedAPIs.some((r) => pathname.startsWith(r));
@@ -13,10 +23,6 @@ export function middleware(request: NextRequest) {
   if (!isProtectedPage && !isProtectedAPI) {
     return NextResponse.next();
   }
-
-  const sessionCookie =
-    request.cookies.get("better-auth.session_token") ??
-    request.cookies.get("__Secure-better-auth.session_token");
 
   if (!sessionCookie) {
     if (isProtectedAPI) {
@@ -31,5 +37,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/history/:path*", "/view/:path*", "/api/files/:path*", "/api/file/:path*"],
+  matcher: ["/", "/login", "/history/:path*", "/view/:path*", "/api/files/:path*", "/api/file/:path*"],
 };
