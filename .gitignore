@@ -6,3 +6,4 @@ dist/
 *.enc
 .DS_Store
 .vercel
+imports/
