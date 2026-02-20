@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 interface PayslipFile {
   id: string;
@@ -40,10 +41,9 @@ export default function HistoryPage() {
         setState({ step: "ready", files });
       })
       .catch((err) => {
-        setState({
-          step: "error",
-          message: err instanceof Error ? err.message : "Failed to load",
-        });
+        const message = err instanceof Error ? err.message : "Failed to load";
+        setState({ step: "error", message });
+        toast.error(message);
       });
   };
 

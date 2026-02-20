@@ -9,6 +9,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -58,6 +59,7 @@ export default function Viewer({ fileId }: { fileId: string }) {
               ? err.message
               : "Decryption failed";
         setState({ step: "error", message });
+        toast.error(message);
       }
     },
     [password, fileId]
