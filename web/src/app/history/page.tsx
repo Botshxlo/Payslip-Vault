@@ -28,22 +28,25 @@ function cleanFilename(name: string): string {
   return name.replace(/_\d+\.enc$/, "");
 }
 
-const MONTHS = [
-  "january", "february", "march", "april", "may", "june",
-  "july", "august", "september", "october", "november", "december",
-];
-
 function extractPayslipMonth(name: string): string | null {
-  const cleaned = cleanFilename(name).toLowerCase();
-  for (const month of MONTHS) {
-    if (cleaned.includes(month)) {
-      const yearMatch = cleaned.match(/\b(20\d{2})\b/);
-      if (yearMatch) {
-        return `${month.charAt(0).toUpperCase() + month.slice(1)} ${yearMatch[1]}`;
-      }
-    }
+  const cleaned = cleanFilename(name);
+  // Match YYYY-MM-DD pattern in filename (e.g. "Payslip 2025-11-30")
+  const match = cleaned.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return date.toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
   }
   return null;
+}
+
+function extractPayslipDate(name: string): string {
+  const cleaned = cleanFilename(name);
+  const match = cleaned.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return date.toLocaleDateString("en-ZA", { dateStyle: "long" });
+  }
+  return cleaned;
 }
 
 function groupByMonth(files: PayslipFile[]): Map<string, PayslipFile[]> {
@@ -231,10 +234,10 @@ export default function HistoryPage() {
                         <Link key={file.id} href={`/view/${file.id}`}>
                           <Card className="cursor-pointer px-5 py-4 transition-colors hover:bg-accent">
                             <div className="font-medium">
-                              {cleanFilename(file.name)}
+                              {extractPayslipDate(file.name)}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              Uploaded {formatDate(file.createdTime)}
+                              {cleanFilename(file.name)}
                             </div>
                           </Card>
                         </Link>
