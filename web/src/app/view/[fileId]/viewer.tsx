@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
@@ -22,9 +22,25 @@ type ViewerState =
   | { step: "ready"; url: string; numPages: number }
   | { step: "error"; message: string };
 
+function usePageWidth() {
+  const [width, setWidth] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth : 768
+  );
+
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Max 768px content width, minus horizontal padding (24px each side)
+  return Math.min(768, width - 48);
+}
+
 export default function Viewer({ fileId }: { fileId: string }) {
   const [state, setState] = useState<ViewerState>({ step: "idle" });
   const [password, setPassword] = useState("");
+  const pageWidth = usePageWidth();
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -190,7 +206,7 @@ export default function Viewer({ fileId }: { fileId: string }) {
               <div key={i} className="mb-4 overflow-hidden rounded-lg border border-border">
                 <Page
                   pageNumber={i + 1}
-                  width={Math.min(768, typeof window !== "undefined" ? window.innerWidth - 48 : 768)}
+                  width={pageWidth}
                   renderAnnotationLayer
                   renderTextLayer
                 />
