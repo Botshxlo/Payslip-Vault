@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   title: "Payslip Vault",
   description:
     "Secure, encrypted payslip storage with zero-knowledge browser decryption.",
+  openGraph: {
+    title: "Payslip Vault",
+    description:
+      "Secure, encrypted payslip storage with zero-knowledge browser decryption.",
+    siteName: "Payslip Vault",
+  },
 };
 
 export default function RootLayout({
