@@ -50,6 +50,11 @@ export default function Viewer({ fileId }: { fileId: string }) {
 
       try {
         const res = await fetch(`/api/file/${fileId}`);
+        if (res.status === 401) {
+          toast.error("Session expired. Please sign in again.");
+          window.location.href = `/login?redirect=/view/${fileId}`;
+          return;
+        }
         if (!res.ok) {
           throw new Error(
             res.status === 404

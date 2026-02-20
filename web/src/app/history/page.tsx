@@ -36,6 +36,11 @@ export default function HistoryPage() {
     setState({ step: "loading" });
     fetch("/api/files")
       .then(async (res) => {
+        if (res.status === 401) {
+          toast.error("Session expired. Please sign in again.");
+          window.location.href = "/login?redirect=/history";
+          return;
+        }
         if (!res.ok) throw new Error(`Failed to load (${res.status})`);
         const files: PayslipFile[] = await res.json();
         setState({ step: "ready", files });
