@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { stripPdfPassword } from "../src/lib/decrypt-pdf.js";
 import { encryptBuffer } from "../src/lib/encrypt.js";
-import { uploadToGoogleDrive } from "../src/lib/storage.js";
+import { uploadToGoogleDrive, payslipExists } from "../src/lib/storage.js";
 
 const IMPORTS_DIR = join(import.meta.dirname!, "..", "imports");
 
@@ -33,6 +33,7 @@ async function main() {
   console.log(`Found ${files.length} PDF(s) to import:\n`);
 
   let success = 0;
+  let skipped = 0;
   let failed = 0;
 
   for (const file of files.sort()) {
@@ -42,6 +43,12 @@ async function main() {
 
     try {
       process.stdout.write(`  ${file} → `);
+
+      if (await payslipExists(basename)) {
+        console.log(`⊘ already exists, skipping`);
+        skipped++;
+        continue;
+      }
 
       const pdfBuffer = await readFile(filepath);
 
@@ -60,7 +67,7 @@ async function main() {
     }
   }
 
-  console.log(`\nDone: ${success} imported, ${failed} failed.`);
+  console.log(`\nDone: ${success} imported, ${skipped} skipped, ${failed} failed.`);
 }
 
 main();

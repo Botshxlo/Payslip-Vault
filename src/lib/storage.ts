@@ -46,6 +46,22 @@ async function getOrCreateVaultFolder(
   return vaultFolderId;
 }
 
+export async function payslipExists(baseName: string): Promise<boolean> {
+  const drive = getDrive();
+  const folderId = await getOrCreateVaultFolder(drive);
+
+  // baseName is e.g. "Payslip 2025-11-30" — search for files starting with it
+  const escaped = baseName.replace(/'/g, "\\'");
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and name contains '${escaped}' and trashed=false`,
+    fields: "files(id,name)",
+    spaces: "drive",
+    pageSize: 1,
+  });
+
+  return (res.data.files?.length ?? 0) > 0;
+}
+
 export async function uploadToGoogleDrive(
   data: Buffer,
   filename: string
