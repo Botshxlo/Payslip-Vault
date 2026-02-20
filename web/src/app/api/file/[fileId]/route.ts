@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { drive_v3 } from "@googleapis/drive";
 import { OAuth2Client } from "google-auth-library";
+import { requireAuth } from "@/lib/auth-utils";
 
 function getAuth(): OAuth2Client {
   const auth = new OAuth2Client(
@@ -16,6 +17,9 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ fileId: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+
   const { fileId } = await params;
 
   try {

@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { authClient } from "@/lib/auth-client";
 
 export default function Home() {
+  const { data: session, isPending } = authClient.useSession();
+
   return (
     <div className="flex min-h-svh flex-col items-center justify-center px-6 py-12">
       <main className="flex max-w-lg flex-col items-center text-center">
@@ -31,9 +36,17 @@ export default function Home() {
           decryption. Your password never leaves your device.
         </p>
 
-        <Button asChild size="lg" className="mt-8">
-          <Link href="/history">View Payslip History</Link>
-        </Button>
+        {isPending ? (
+          <div className="mt-8 h-10 w-48 animate-pulse rounded-md bg-muted" />
+        ) : session ? (
+          <Button asChild size="lg" className="mt-8">
+            <Link href="/history">View Payslip History</Link>
+          </Button>
+        ) : (
+          <Button asChild size="lg" className="mt-8">
+            <Link href="/login">Sign In</Link>
+          </Button>
+        )}
 
         <p className="mt-6 text-sm text-muted-foreground/60">
           This is a personal tool. Payslip links are delivered via Slack.
