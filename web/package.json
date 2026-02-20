@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@googleapis/drive": "^20.1.0",
+    "@libsql/client": "^0.17.0",
     "@tailwindcss/postcss": "^4.2.0",
+    "better-auth": "^1.4.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "google-auth-library": "^10.5.0",
