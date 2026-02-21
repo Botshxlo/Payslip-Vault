@@ -5,6 +5,8 @@ import { stripPdfPassword } from "../src/lib/decrypt-pdf.js";
 import { encryptBuffer } from "../src/lib/encrypt.js";
 import { uploadToGoogleDrive, payslipExists } from "../src/lib/storage.js";
 import { notifySlack } from "../src/lib/notify.js";
+import { extractPayslipText, parsePayslipData } from "../src/lib/parse-payslip.js";
+import { storePayslipData } from "../src/lib/payslip-store.js";
 
 loadEnvFile(join(import.meta.dirname!, "..", ".env"));
 
@@ -67,6 +69,19 @@ async function main() {
         driveFileId: driveFile.id!,
         driveFileName: driveFile.name!,
       });
+
+      // Extract payslip data and store in Turso
+      const dateMatch = file.match(/(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch && vaultSecret) {
+        try {
+          const text = await extractPayslipText(unlockedPdf);
+          const payslipData = parsePayslipData(text);
+          await storePayslipData(driveFile.id!, dateMatch[1], payslipData, vaultSecret);
+        } catch {
+          // Non-fatal: log but continue
+          console.log(`  ⚠ data extraction failed, payslip still uploaded`);
+        }
+      }
 
       console.log(`✓ uploaded as ${driveFile.name} (${driveFile.id})`);
       success++;
