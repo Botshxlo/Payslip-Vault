@@ -18,6 +18,7 @@ import {
   Calendar,
   Clock,
   ChevronRight,
+  TrendingUp,
 } from "lucide-react";
 
 interface PayslipFile {
@@ -227,15 +228,28 @@ export default function HistoryPage() {
             </span>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-muted-foreground hover:text-foreground"
-            onClick={handleSignOut}
-          >
-            <LogOut className="size-4" />
-            <span className="hidden sm:inline">Sign out</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              asChild
+            >
+              <Link href="/insights">
+                <TrendingUp className="size-4" />
+                <span className="hidden sm:inline">Insights</span>
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              onClick={handleSignOut}
+            >
+              <LogOut className="size-4" />
+              <span className="hidden sm:inline">Sign out</span>
+            </Button>
+          </div>
         </div>
       </header>
 

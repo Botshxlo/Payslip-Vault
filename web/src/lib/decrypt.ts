@@ -59,3 +59,23 @@ export async function decryptBuffer(
 
   return new Uint8Array(decrypted);
 }
+
+/**
+ * Decrypt a base64-encoded encrypted JSON string and parse it.
+ * Used for payslip data stored in Turso.
+ */
+export async function decryptJson<T>(
+  base64Data: string,
+  password: string
+): Promise<T> {
+  // Decode base64 to ArrayBuffer
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  const decrypted = await decryptBuffer(bytes.buffer as ArrayBuffer, password);
+  const jsonString = new TextDecoder().decode(decrypted);
+  return JSON.parse(jsonString) as T;
+}

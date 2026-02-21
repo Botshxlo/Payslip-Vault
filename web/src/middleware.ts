@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const protectedPages = ["/history", "/view"];
-const protectedAPIs = ["/api/files", "/api/file"];
+const protectedPages = ["/history", "/view", "/insights"];
+const protectedAPIs = ["/api/files", "/api/file", "/api/payslip-data"];
 const publicOnlyPages = ["/", "/login"];
 
 export function middleware(request: NextRequest) {
@@ -37,5 +37,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/history/:path*", "/view/:path*", "/api/files/:path*", "/api/file/:path*"],
+  matcher: ["/", "/login", "/history/:path*", "/view/:path*", "/insights/:path*", "/api/files/:path*", "/api/file/:path*", "/api/payslip-data/:path*"],
 };
