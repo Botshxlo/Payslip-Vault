@@ -1,3 +1,5 @@
+import type { PayslipChange } from "./detect-changes.js";
+
 interface NotifyPayload {
   filename: string;
   driveFileId: string;
@@ -90,6 +92,68 @@ export async function notifyDuplicate(filename: string): Promise<void> {
           type: "mrkdwn",
           text: `A payslip for *${filename}* already exists in the vault and was not uploaded again.`,
         },
+      },
+    ],
+  };
+
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Slack webhook failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+export async function notifyPayslipChanges(
+  payslipDate: string,
+  changes: PayslipChange[]
+): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) throw new Error("SLACK_WEBHOOK_URL is not set");
+
+  const changeLines = changes.map((c) => {
+    const arrow = c.type === "increased" ? "↑" : c.type === "decreased" ? "↓" : "";
+    if (c.type === "new") return `*New:* ${c.field}`;
+    if (c.type === "removed") return `*Removed:* ${c.field}`;
+    const sign = c.percentChange > 0 ? "+" : "";
+    return `*${c.field}:* ${arrow} ${sign}${c.percentChange}%`;
+  });
+
+  const body = {
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "Payslip Changes Detected",
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `Changes found for *${payslipDate}* compared to the previous month:`,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: changeLines.join("\n"),
+        },
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: "Percentage changes only · No amounts shown for security",
+          },
+        ],
       },
     ],
   };
