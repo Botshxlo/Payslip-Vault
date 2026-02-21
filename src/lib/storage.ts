@@ -83,3 +83,41 @@ export async function uploadToGoogleDrive(
 
   return res.data;
 }
+
+/**
+ * List all files in the "Payslip Vault" Drive folder.
+ * Handles pagination for large folders.
+ */
+export async function listVaultFiles(): Promise<drive_v3.Schema$File[]> {
+  const drive = getDrive();
+  const folderId = await getOrCreateVaultFolder(drive);
+
+  const files: drive_v3.Schema$File[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const res = await drive.files.list({
+      q: `'${folderId}' in parents and trashed=false`,
+      fields: "nextPageToken, files(id, name)",
+      spaces: "drive",
+      pageSize: 100,
+      pageToken,
+    });
+    files.push(...(res.data.files ?? []));
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  return files;
+}
+
+/**
+ * Download a file's content from Drive as a Buffer.
+ */
+export async function downloadEncFile(fileId: string): Promise<Buffer> {
+  const drive = getDrive();
+  const res = await drive.files.get(
+    { fileId, alt: "media" },
+    { responseType: "arraybuffer" }
+  );
+  return Buffer.from(res.data as ArrayBuffer);
+}
