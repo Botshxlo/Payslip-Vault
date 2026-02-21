@@ -70,6 +70,41 @@ export async function notifySlack({
   }
 }
 
+export async function notifyDuplicate(filename: string): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) throw new Error("SLACK_WEBHOOK_URL is not set");
+
+  const body = {
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "Duplicate Payslip Skipped",
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `A payslip for *${filename}* already exists in the vault and was not uploaded again.`,
+        },
+      },
+    ],
+  };
+
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Slack webhook failed: ${res.status} ${await res.text()}`);
+  }
+}
+
 export async function notifyTokenWarning(message: string): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   if (!webhookUrl) throw new Error("SLACK_WEBHOOK_URL is not set");

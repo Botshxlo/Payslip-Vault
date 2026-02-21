@@ -3,7 +3,7 @@ import { extractPayslipAttachment } from "../lib/gmail.js";
 import { stripPdfPassword } from "../lib/decrypt-pdf.js";
 import { encryptBuffer } from "../lib/encrypt.js";
 import { uploadToGoogleDrive, payslipExists } from "../lib/storage.js";
-import { notifySlack } from "../lib/notify.js";
+import { notifySlack, notifyDuplicate } from "../lib/notify.js";
 
 export const processPayslip = task({
   id: "process-payslip",
@@ -15,6 +15,7 @@ export const processPayslip = task({
     const baseName = filename.replace(/\.pdf$/i, "");
     if (await payslipExists(baseName)) {
       logger.info("Payslip already exists in Drive, skipping", { filename });
+      await notifyDuplicate(filename);
       return { success: true, skipped: true };
     }
 

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { stripPdfPassword } from "../src/lib/decrypt-pdf.js";
 import { encryptBuffer } from "../src/lib/encrypt.js";
 import { uploadToGoogleDrive, payslipExists } from "../src/lib/storage.js";
+import { notifySlack } from "../src/lib/notify.js";
 
 const IMPORTS_DIR = join(import.meta.dirname!, "..", "imports");
 
@@ -57,6 +58,12 @@ async function main() {
       const encrypted = encryptBuffer(unlockedPdf, vaultSecret);
 
       const driveFile = await uploadToGoogleDrive(encrypted, encFilename);
+
+      await notifySlack({
+        filename: file,
+        driveFileId: driveFile.id!,
+        driveFileName: driveFile.name!,
+      });
 
       console.log(`✓ uploaded as ${driveFile.name} (${driveFile.id})`);
       success++;
