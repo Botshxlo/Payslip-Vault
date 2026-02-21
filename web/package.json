@@ -10,6 +10,7 @@
   "dependencies": {
     "@googleapis/drive": "^20.1.0",
     "@libsql/client": "^0.17.0",
+    "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/postcss": "^4.2.0",
     "better-auth": "^1.4.18",
     "class-variance-authority": "^0.7.1",
