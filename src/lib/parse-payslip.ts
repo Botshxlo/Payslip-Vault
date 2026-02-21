@@ -63,26 +63,9 @@ function extractCurrentAmount(line: string): number {
 }
 
 /**
- * Parse structured payslip data from raw PDF text.
- *
- * SimplePay (South Africa) payslip format:
- *   Income [Current] [YTD]         ← total income (gross)
- *   Basic Salary [Current] [YTD]
- *   Allowance [Current] [YTD]      ← total allowances (optional)
- *   [Allowance Name] [Current] [YTD]
- *   Deduction [Current] [YTD]      ← total deductions
- *   UIF - Employee [Current] [YTD]
- *   Tax (PAYE) [Current] [YTD]
- *   Employer Contribution ...
- *   Benefit ...
- *   NETT PAY R xx,xxx.xx
+ * Parse a single payslip block from raw text lines.
  */
-export function parsePayslipData(text: string): PayslipData {
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-
+function parseSinglePayslip(lines: string[]): PayslipData {
   let grossPay = 0;
   let basicSalary = 0;
   let netPay = 0;
@@ -97,13 +80,11 @@ export function parsePayslipData(text: string): PayslipData {
   const allowances: { name: string; amount: number }[] = [];
   const benefits: { name: string; amount: number }[] = [];
 
-  // Track which section we're in
   type Section = "none" | "income" | "allowance" | "deduction" | "employer" | "benefit";
   let section: Section = "none";
 
   for (const line of lines) {
     // Detect section headers — pdf-parse v1 may jam label+amounts together
-    // e.g. "Income28,636.3628,636.36" or "Income 28,636.36 28,636.36"
     if (/^Income[\s\d]/i.test(line) && /\d/.test(line)) {
       grossPay = extractCurrentAmount(line);
       section = "income";
@@ -127,20 +108,18 @@ export function parsePayslipData(text: string): PayslipData {
       continue;
     }
 
-    // NETT PAY line ends the payslip data
     if (/NETT\s*PAY/i.test(line)) {
       netPay = extractCurrentAmount(line);
       break;
     }
 
-    // Skip section dividers like "Current YTD" or "CurrentYTD"
+    // Skip section dividers like "CurrentYTD"
     if (/^Current\s*YTD$/i.test(line)) continue;
 
     const amount = extractCurrentAmount(line);
     if (amount === 0) continue;
 
-    // Extract the label (text before the amounts — may have no space before digits)
-    const label = line.replace(/\s*[\d,]+\.\d{2}.*$/, "").trim();
+    const label = line.replace(/\s*-?[\d,]+\.\d{2}.*$/, "").trim();
 
     switch (section) {
       case "income":
@@ -195,4 +174,119 @@ export function parsePayslipData(text: string): PayslipData {
     ...(bonus ? { bonus } : {}),
     ...(overtime ? { overtime } : {}),
   };
+}
+
+/**
+ * Merge multiple PayslipData objects by summing numeric fields
+ * and concatenating array fields (deduping by name, summing amounts).
+ */
+function mergePayslips(payslips: PayslipData[]): PayslipData {
+  if (payslips.length === 1) return payslips[0];
+
+  const merged: PayslipData = {
+    grossPay: 0,
+    basicSalary: 0,
+    netPay: 0,
+    paye: 0,
+    uif: 0,
+    pension: 0,
+    medicalAid: 0,
+    otherDeductions: [],
+    totalDeductions: 0,
+    allowances: [],
+    benefits: [],
+  };
+
+  let bonus = 0;
+  let overtime = 0;
+
+  for (const p of payslips) {
+    merged.grossPay += p.grossPay;
+    merged.basicSalary += p.basicSalary;
+    merged.netPay += p.netPay;
+    merged.paye += p.paye;
+    merged.uif += p.uif;
+    merged.pension += p.pension;
+    merged.medicalAid += p.medicalAid;
+    merged.totalDeductions += p.totalDeductions;
+    bonus += p.bonus ?? 0;
+    overtime += p.overtime ?? 0;
+
+    // Merge named items by summing amounts for same name
+    for (const d of p.otherDeductions) {
+      const existing = merged.otherDeductions.find((e) => e.name === d.name);
+      if (existing) existing.amount += d.amount;
+      else merged.otherDeductions.push({ ...d });
+    }
+    for (const a of p.allowances) {
+      const existing = merged.allowances.find((e) => e.name === a.name);
+      if (existing) existing.amount += a.amount;
+      else merged.allowances.push({ ...a });
+    }
+    for (const b of p.benefits) {
+      const existing = merged.benefits.find((e) => e.name === b.name);
+      if (existing) existing.amount += b.amount;
+      else merged.benefits.push({ ...b });
+    }
+  }
+
+  if (bonus) merged.bonus = bonus;
+  if (overtime) merged.overtime = overtime;
+
+  // Round to 2dp to avoid floating point drift
+  const r = (n: number) => Math.round(n * 100) / 100;
+  merged.grossPay = r(merged.grossPay);
+  merged.basicSalary = r(merged.basicSalary);
+  merged.netPay = r(merged.netPay);
+  merged.paye = r(merged.paye);
+  merged.uif = r(merged.uif);
+  merged.pension = r(merged.pension);
+  merged.medicalAid = r(merged.medicalAid);
+  merged.totalDeductions = r(merged.totalDeductions);
+
+  return merged;
+}
+
+/**
+ * Parse structured payslip data from raw PDF text.
+ * Supports merged PDFs containing multiple payslips — splits on
+ * NETT PAY boundaries and sums the results.
+ *
+ * SimplePay (South Africa) payslip format:
+ *   Income [Current] [YTD]         ← total income (gross)
+ *   Basic Salary [Current] [YTD]
+ *   Allowance [Current] [YTD]      ← total allowances (optional)
+ *   [Allowance Name] [Current] [YTD]
+ *   Deduction [Current] [YTD]      ← total deductions
+ *   UIF - Employee [Current] [YTD]
+ *   Tax (PAYE) [Current] [YTD]
+ *   Employer Contribution ...
+ *   Benefit ...
+ *   NETT PAY R xx,xxx.xx
+ */
+export function parsePayslipData(text: string): PayslipData {
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  // Split into blocks — each block ends at a NETT PAY line
+  const blocks: string[][] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    current.push(line);
+    if (/NETT\s*PAY/i.test(line)) {
+      blocks.push(current);
+      current = [];
+    }
+  }
+
+  // If no NETT PAY found, treat entire text as one block
+  if (blocks.length === 0 && current.length > 0) {
+    blocks.push(current);
+  }
+
+  const payslips = blocks.map(parseSinglePayslip);
+  return mergePayslips(payslips);
 }
