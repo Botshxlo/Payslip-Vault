@@ -12,6 +12,7 @@ import {
   LogOut,
   Shield,
   Lock,
+  LockOpen,
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -83,6 +84,100 @@ function formatMonth(dateStr: string): string {
     month: "short",
     year: "2-digit",
   });
+}
+
+const CIPHER_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+
+function CipherText({ progress, total }: { progress: number; total: number }) {
+  const [chars, setChars] = useState<string[]>([]);
+  const ratio = total > 0 ? progress / total : 0;
+
+  useEffect(() => {
+    const len = 48;
+    const resolved = Math.floor(ratio * len);
+    const interval = setInterval(() => {
+      setChars(
+        Array.from({ length: len }, (_, i) => {
+          if (i < resolved) return "\u00A0";
+          return CIPHER_CHARS[Math.floor(Math.random() * CIPHER_CHARS.length)];
+        })
+      );
+    }, 50);
+    return () => clearInterval(interval);
+  }, [ratio]);
+
+  return (
+    <div className="font-mono text-xs tracking-widest text-accent/40 select-none overflow-hidden whitespace-nowrap">
+      {chars.join("")}
+    </div>
+  );
+}
+
+function DecryptionAnimation({
+  progress,
+  total,
+}: {
+  progress: number;
+  total: number;
+}) {
+  const ratio = total > 0 ? progress / total : 0;
+  const isAlmostDone = ratio > 0.9;
+  const percentage = Math.round(ratio * 100);
+
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center pt-16 animate-in fade-in duration-300">
+      {/* Animated lock icon */}
+      <div className="relative mb-6">
+        <div
+          className={`flex h-16 w-16 items-center justify-center rounded-2xl border transition-all duration-500 ${
+            isAlmostDone
+              ? "border-accent bg-accent/10 scale-110"
+              : "border-border bg-card"
+          }`}
+        >
+          {isAlmostDone ? (
+            <LockOpen className="size-7 text-accent animate-in zoom-in duration-300" />
+          ) : (
+            <Lock className="size-7 text-muted-foreground animate-pulse" />
+          )}
+        </div>
+        {/* Pulse ring */}
+        <div
+          className="absolute inset-0 rounded-2xl border border-accent/20 animate-ping"
+          style={{ animationDuration: "2s" }}
+        />
+      </div>
+
+      {/* Status text */}
+      <h2 className="font-heading text-xl font-bold text-foreground mb-1">
+        {isAlmostDone ? "Almost there..." : "Decrypting payslips"}
+      </h2>
+      <p className="text-sm text-muted-foreground tabular-nums mb-5">
+        {progress} of {total} payslips decrypted
+      </p>
+
+      {/* Cipher text lines */}
+      <div className="flex flex-col gap-1.5 mb-6 w-full max-w-xs">
+        <CipherText progress={progress} total={total} />
+        <CipherText progress={Math.max(0, progress - 2)} total={total} />
+        <CipherText progress={Math.max(0, progress - 4)} total={total} />
+      </div>
+
+      {/* Progress bar */}
+      <div className="w-full max-w-xs">
+        <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+          <div
+            className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+        <div className="mt-2 flex justify-between text-[11px] text-muted-foreground tabular-nums">
+          <span>{percentage}%</span>
+          <span>AES-256-GCM</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function InsightsViewer() {
@@ -165,7 +260,7 @@ export default function InsightsViewer() {
         toast.error(message);
       }
     },
-    []
+    [password]
   );
 
   const handleSignOut = async () => {
@@ -270,9 +365,17 @@ export default function InsightsViewer() {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        {/* Decryption animation */}
+        {state.step === "loading" && (
+          <DecryptionAnimation
+            progress={state.progress}
+            total={state.total}
+          />
+        )}
+
         {/* Password gate */}
-        {state.step !== "ready" && (
-          <div className="flex flex-1 flex-col items-center justify-center pt-16">
+        {(state.step === "idle" || state.step === "error") && (
+          <div className="flex flex-1 flex-col items-center justify-center pt-16 animate-in fade-in duration-300">
             <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
               <Lock className="size-6 text-muted-foreground" />
             </div>
@@ -298,40 +401,14 @@ export default function InsightsViewer() {
                     }}
                     placeholder="Vault password"
                     required
-                    disabled={state.step === "loading"}
+                    autoFocus
                   />
                   <Button
                     type="submit"
-                    disabled={state.step === "loading" || !password}
+                    disabled={!password}
                     className="w-full"
                   >
-                    {state.step === "loading" ? (
-                      <span className="flex items-center gap-2">
-                        <svg
-                          className="size-4 animate-spin"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                          />
-                        </svg>
-                        Decrypting {state.progress}/{state.total}...
-                      </span>
-                    ) : (
-                      "Decrypt & Analyze"
-                    )}
+                    Decrypt & Analyze
                   </Button>
                 </form>
 
@@ -347,7 +424,7 @@ export default function InsightsViewer() {
 
         {/* Charts & Data */}
         {state.step === "ready" && (
-          <>
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Summary cards */}
             <div className="mb-8 grid grid-cols-3 gap-3">
               <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
@@ -642,7 +719,7 @@ export default function InsightsViewer() {
                 minutes of inactivity.
               </p>
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>

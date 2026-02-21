@@ -116,7 +116,7 @@ export default function Viewer({ fileId }: { fileId: string }) {
         toast.error(message);
       }
     },
-    [fileId]
+    [password, fileId]
   );
 
   return (
