@@ -1,5 +1,5 @@
 import { schedules, logger } from "@trigger.dev/sdk/v3";
-import { findPayslipEmails, markAsRead } from "../lib/gmail.js";
+import { findPayslipEmails, markAsRead, deleteEmail } from "../lib/gmail.js";
 import { processPayslip } from "./payslip.js";
 
 export const pollGmailForPayslips = schedules.task({
@@ -10,9 +10,14 @@ export const pollGmailForPayslips = schedules.task({
     logger.info(`Found ${messageIds.length} unread payslip email(s)`);
 
     for (const messageId of messageIds) {
-      await processPayslip.trigger({ messageId });
-      await markAsRead(messageId);
-      logger.info("Triggered processing and marked as read", { messageId });
+      const result = await processPayslip.triggerAndWait({ messageId });
+      if (result.ok) {
+        await deleteEmail(messageId);
+        logger.info("Processed and trashed email", { messageId });
+      } else {
+        await markAsRead(messageId);
+        logger.error("Processing failed, marked as read only", { messageId });
+      }
     }
 
     return { emailsFound: messageIds.length };

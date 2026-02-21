@@ -73,3 +73,11 @@ export async function markAsRead(messageId: string): Promise<void> {
     },
   });
 }
+
+export async function deleteEmail(messageId: string): Promise<void> {
+  const gmail = getGmail();
+  await gmail.users.messages.trash({
+    userId: "me",
+    id: messageId,
+  });
+}
