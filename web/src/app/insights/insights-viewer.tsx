@@ -117,6 +117,8 @@ export default function InsightsViewer() {
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      const pw = password;
+      setPassword("");
       setState({ step: "loading", progress: 0, total: 0 });
 
       try {
@@ -136,7 +138,7 @@ export default function InsightsViewer() {
           const row = encrypted[i];
           const data = await decryptJson<PayslipData>(
             row.encryptedData,
-            password
+            pw
           );
           decrypted.push({ payslipDate: row.payslipDate, data });
           setState({
@@ -163,7 +165,7 @@ export default function InsightsViewer() {
         toast.error(message);
       }
     },
-    [password]
+    []
   );
 
   const handleSignOut = async () => {

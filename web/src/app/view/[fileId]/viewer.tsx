@@ -76,6 +76,8 @@ export default function Viewer({ fileId }: { fileId: string }) {
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      const pw = password;
+      setPassword("");
 
       setState({ step: "loading" });
 
@@ -95,7 +97,7 @@ export default function Viewer({ fileId }: { fileId: string }) {
         }
 
         const encryptedData = await res.arrayBuffer();
-        const pdfBytes = await decryptBuffer(encryptedData, password);
+        const pdfBytes = await decryptBuffer(encryptedData, pw);
 
         const blob = new Blob([pdfBytes.buffer as ArrayBuffer], {
           type: "application/pdf",
@@ -114,7 +116,7 @@ export default function Viewer({ fileId }: { fileId: string }) {
         toast.error(message);
       }
     },
-    [password, fileId]
+    [fileId]
   );
 
   return (
