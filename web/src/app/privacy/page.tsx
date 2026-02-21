@@ -11,7 +11,7 @@ export default function Privacy() {
           &larr; Back
         </Link>
 
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight">
+        <h1 className="mt-6 font-heading text-2xl font-bold tracking-tight">
           Privacy Policy
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">

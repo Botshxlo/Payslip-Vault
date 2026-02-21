@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { Shield } from "lucide-react";
 
 function LoginContent() {
   const router = useRouter();
@@ -74,24 +75,10 @@ function LoginContent() {
     <div className="flex min-h-svh flex-col items-center justify-center px-6">
       <div className="flex max-w-sm flex-col items-center text-center">
         <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-muted-foreground"
-          >
-            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
+          <Shield className="size-7 text-accent" />
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl font-bold tracking-tight">
           Sign in to Payslip Vault
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
