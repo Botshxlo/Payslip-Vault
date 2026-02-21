@@ -24,6 +24,9 @@ Gmail (SimplePay) → Trigger.dev poll (hourly) → extract PDF → qpdf strip p
 npm run dev          # Start Trigger.dev local dev mode
 npm run deploy       # Deploy tasks to Trigger.dev cloud
 npm run decrypt      # CLI: tsx scripts/decrypt.ts <file.enc> [output.pdf]
+tsx scripts/inspect-payslip.ts   # Print raw text from a payslip PDF
+tsx scripts/migrate.ts           # Create payslip_data table in Turso
+tsx scripts/backfill.ts          # Backfill existing Drive payslips into Turso
 ```
 
 ### Web (Next.js app, run from `web/`)
@@ -68,7 +71,7 @@ Binary layout of `.enc` files — must stay in sync between `src/lib/encrypt.ts`
 ## Environment Variables
 
 ### Root `.env`
-`TRIGGER_SECRET_KEY`, `ID_NUMBER` (PDF password), `VAULT_SECRET` (encryption passphrase), `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REDIRECT_URI`, `GMAIL_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN`, `SLACK_WEBHOOK_URL`, `VIEWER_BASE_URL`
+`TRIGGER_SECRET_KEY`, `ID_NUMBER` (PDF password), `VAULT_SECRET` (encryption passphrase), `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REDIRECT_URI`, `GMAIL_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN`, `SLACK_WEBHOOK_URL`, `VIEWER_BASE_URL`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 
 ### Web `web/.env.local`
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN` (same Drive credentials as root; no Gmail creds needed)
