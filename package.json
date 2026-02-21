@@ -11,8 +11,10 @@
   "dependencies": {
     "@googleapis/drive": "^20.1.0",
     "@googleapis/gmail": "^16.1.1",
+    "@libsql/client": "^0.17.0",
     "@trigger.dev/sdk": "^4.3.3",
-    "google-auth-library": "^10.5.0"
+    "google-auth-library": "^10.5.0",
+    "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
     "@trigger.dev/build": "^4.3.3",
