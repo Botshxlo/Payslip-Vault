@@ -76,6 +76,23 @@ function extractPayslipDateParts(name: string) {
   };
 }
 
+function extractIsoDate(name: string): string {
+  const match = cleanFilename(name).match(/(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : "";
+}
+
+function sortByPayslipDate(files: PayslipFile[]): PayslipFile[] {
+  return [...files].sort((a, b) => {
+    const dateA = extractIsoDate(a.name);
+    const dateB = extractIsoDate(b.name);
+    // Descending — newest first; fall back to createdTime
+    if (dateA && dateB) return dateB.localeCompare(dateA);
+    if (dateA) return -1;
+    if (dateB) return 1;
+    return b.createdTime.localeCompare(a.createdTime);
+  });
+}
+
 function groupByMonth(files: PayslipFile[]): Map<string, PayslipFile[]> {
   const groups = new Map<string, PayslipFile[]>();
   for (const file of files) {
@@ -111,7 +128,7 @@ export default function HistoryPage() {
         }
         if (!res.ok) throw new Error(`Failed to load (${res.status})`);
         const files: PayslipFile[] = await res.json();
-        setState({ step: "ready", files });
+        setState({ step: "ready", files: sortByPayslipDate(files) });
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : "Failed to load";

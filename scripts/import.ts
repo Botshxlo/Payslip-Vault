@@ -1,9 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { loadEnvFile } from "node:process";
 import { stripPdfPassword } from "../src/lib/decrypt-pdf.js";
 import { encryptBuffer } from "../src/lib/encrypt.js";
 import { uploadToGoogleDrive, payslipExists } from "../src/lib/storage.js";
 import { notifySlack } from "../src/lib/notify.js";
+
+loadEnvFile(join(import.meta.dirname!, "..", ".env"));
 
 const IMPORTS_DIR = join(import.meta.dirname!, "..", "imports");
 
