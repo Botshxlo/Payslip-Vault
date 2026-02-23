@@ -18,8 +18,11 @@ import {
   DollarSign,
   Calendar,
   BarChart3,
+  Activity,
+  FileDown,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { generateProofOfIncome } from "@/lib/generate-proof-of-income";
 import {
   LineChart,
   Line,
@@ -32,8 +35,9 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { calculateRealValue, getCumulativeInflation, loadCPIData } from "@/lib/inflation";
 
-interface PayslipData {
+export interface PayslipData {
   grossPay: number;
   basicSalary: number;
   netPay: number;
@@ -55,7 +59,7 @@ interface EncryptedRow {
   encryptedData: string;
 }
 
-interface DecryptedRow {
+export interface DecryptedRow {
   payslipDate: string;
   data: PayslipData;
 }
@@ -183,6 +187,7 @@ function DecryptionAnimation({
 export default function InsightsViewer() {
   const [state, setState] = useState<ViewerState>({ step: "idle" });
   const [password, setPassword] = useState("");
+  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const lockTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
   const resetLockTimer = useCallback(() => {
@@ -217,7 +222,10 @@ export default function InsightsViewer() {
       setState({ step: "loading", progress: 0, total: 0 });
 
       try {
-        const res = await fetch("/api/payslip-data");
+        const [res] = await Promise.all([
+          fetch("/api/payslip-data"),
+          loadCPIData(),
+        ]);
         if (res.status === 401) {
           toast.error("Session expired. Please sign in again.");
           window.location.href = "/login?redirect=/insights";
@@ -248,6 +256,10 @@ export default function InsightsViewer() {
           a.payslipDate.localeCompare(b.payslipDate)
         );
 
+        // Pre-select last 3 months for proof of income
+        const last3 = decrypted.slice(-3).map((r) => r.payslipDate);
+        setSelectedMonths(new Set(last3));
+
         setState({ step: "ready", rows: decrypted });
       } catch (err) {
         const message =
@@ -270,12 +282,21 @@ export default function InsightsViewer() {
 
   // Chart data
   const netPayData = useMemo(() => {
-    if (state.step !== "ready") return [];
-    return state.rows.map((r) => ({
-      month: formatMonth(r.payslipDate),
-      netPay: r.data.netPay,
-      grossPay: r.data.grossPay,
-    }));
+    if (state.step !== "ready" || state.rows.length === 0) return [];
+    const baseMonth = state.rows[0].payslipDate;
+    return state.rows.map((r) => {
+      const realNet = calculateRealValue(
+        r.data.netPay,
+        r.payslipDate,
+        baseMonth
+      );
+      return {
+        month: formatMonth(r.payslipDate),
+        netPay: r.data.netPay,
+        grossPay: r.data.grossPay,
+        realNetPay: realNet !== null ? Math.round(realNet) : null,
+      };
+    });
   }, [state]);
 
   const deductionData = useMemo(() => {
@@ -317,16 +338,56 @@ export default function InsightsViewer() {
   // Summary stats
   const summary = useMemo(() => {
     if (state.step !== "ready" || state.rows.length === 0)
-      return { latestNet: 0, avgNet: 0, months: 0 };
-    const latest = state.rows[state.rows.length - 1].data.netPay;
+      return { latestNet: 0, avgNet: 0, months: 0, realPayChange: null as number | null, baseMonth: "" };
+    const rows = state.rows;
+    const latest = rows[rows.length - 1].data.netPay;
     const avg =
-      state.rows.reduce((s, r) => s + r.data.netPay, 0) / state.rows.length;
+      rows.reduce((s, r) => s + r.data.netPay, 0) / rows.length;
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+    const baseMonth = first.payslipDate;
+
+    let realPayChange: number | null = null;
+    if (rows.length >= 2) {
+      const nominalGrowth =
+        first.data.netPay > 0
+          ? ((last.data.netPay - first.data.netPay) / first.data.netPay) * 100
+          : null;
+      const inflation = getCumulativeInflation(
+        first.payslipDate,
+        last.payslipDate
+      );
+      if (nominalGrowth !== null && inflation !== null) {
+        realPayChange = Math.round((nominalGrowth - inflation) * 10) / 10;
+      }
+    }
+
     return {
       latestNet: latest,
       avgNet: Math.round(avg),
-      months: state.rows.length,
+      months: rows.length,
+      realPayChange,
+      baseMonth: formatMonth(baseMonth),
     };
   }, [state]);
+
+  const toggleMonth = useCallback((month: string) => {
+    setSelectedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(month)) next.delete(month);
+      else next.add(month);
+      return next;
+    });
+  }, []);
+
+  const handleGeneratePDF = useCallback(() => {
+    if (state.step !== "ready") return;
+    const filtered = state.rows.filter((r) =>
+      selectedMonths.has(r.payslipDate)
+    );
+    if (filtered.length === 0) return;
+    generateProofOfIncome(filtered);
+  }, [state, selectedMonths]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -426,7 +487,7 @@ export default function InsightsViewer() {
         {state.step === "ready" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Summary cards */}
-            <div className="mb-8 grid grid-cols-3 gap-3">
+            <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
                 <DollarSign className="size-4 text-accent" />
                 <span className="text-lg font-bold text-foreground">
@@ -454,7 +515,111 @@ export default function InsightsViewer() {
                   Avg Net
                 </span>
               </div>
+              <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
+                <Activity className="size-4 text-accent" />
+                <span
+                  className={`text-lg font-bold tabular-nums ${
+                    summary.realPayChange !== null
+                      ? summary.realPayChange > 0
+                        ? "text-green-600"
+                        : summary.realPayChange < 0
+                          ? "text-red-500"
+                          : "text-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {summary.realPayChange !== null ? (
+                    <span className="inline-flex items-center gap-1">
+                      {summary.realPayChange > 0 ? (
+                        <TrendingUp className="size-3" />
+                      ) : summary.realPayChange < 0 ? (
+                        <TrendingDown className="size-3" />
+                      ) : null}
+                      {summary.realPayChange > 0 ? "+" : ""}
+                      {summary.realPayChange}%
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Real Pay Change
+                </span>
+              </div>
             </div>
+
+            {/* Proof of Income */}
+            <section className="mb-8">
+              <h2 className="font-heading mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+                Proof of Income
+              </h2>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (state.step !== "ready") return;
+                        const last3 = state.rows.slice(-3).map((r) => r.payslipDate);
+                        setSelectedMonths(new Set(last3));
+                      }}
+                    >
+                      Last 3
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (state.step !== "ready") return;
+                        setSelectedMonths(new Set(state.rows.map((r) => r.payslipDate)));
+                      }}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedMonths(new Set())}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {state.step === "ready" &&
+                      state.rows.map((r) => {
+                        const active = selectedMonths.has(r.payslipDate);
+                        return (
+                          <button
+                            key={r.payslipDate}
+                            onClick={() => toggleMonth(r.payslipDate)}
+                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors border ${
+                              active
+                                ? "bg-accent text-accent-foreground border-accent"
+                                : "bg-card text-muted-foreground border-border hover:border-accent/50"
+                            }`}
+                          >
+                            {formatMonth(r.payslipDate)}
+                          </button>
+                        );
+                      })}
+                  </div>
+                  <Button
+                    onClick={handleGeneratePDF}
+                    disabled={selectedMonths.size === 0}
+                    className="gap-2"
+                  >
+                    <FileDown className="size-4" />
+                    Generate PDF
+                    {selectedMonths.size > 0 && (
+                      <span className="text-xs opacity-70">
+                        ({selectedMonths.size} month{selectedMonths.size !== 1 ? "s" : ""})
+                      </span>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </section>
 
             {/* Net Pay trend */}
             <section className="mb-8">
@@ -506,6 +671,16 @@ export default function InsightsViewer() {
                         stroke="var(--color-primary)"
                         strokeWidth={2}
                         dot={{ r: 3 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="realNetPay"
+                        name="Real Net Pay"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        dot={{ r: 2 }}
+                        connectNulls
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -713,7 +888,10 @@ export default function InsightsViewer() {
             </section>
 
             {/* Footer */}
-            <div className="mt-10 border-t border-border pt-6 text-center">
+            <div className="mt-10 border-t border-border pt-6 text-center space-y-1">
+              <p className="text-xs text-muted-foreground">
+                Real pay adjusted for SA CPI inflation (FRED ZAFCPIALLMINMEI). Base: {summary.baseMonth || "N/A"}.
+              </p>
               <p className="text-xs text-muted-foreground">
                 All data decrypted locally in your browser. Auto-locks after 5
                 minutes of inactivity.
