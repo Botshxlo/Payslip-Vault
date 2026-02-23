@@ -20,6 +20,11 @@ import {
   BarChart3,
   Activity,
   FileDown,
+  Wallet,
+  Receipt,
+  Percent,
+  Clock,
+  ChevronDown,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { generateProofOfIncome } from "@/lib/generate-proof-of-income";
@@ -69,6 +74,20 @@ type ViewerState =
   | { step: "loading"; progress: number; total: number }
   | { step: "ready"; rows: DecryptedRow[] }
   | { step: "error"; message: string };
+
+type TotalsFilter = "all" | "this-year" | "last-12" | "custom";
+
+interface TotalsFilterOption {
+  key: TotalsFilter;
+  label: string;
+}
+
+const TOTALS_FILTERS: TotalsFilterOption[] = [
+  { key: "all", label: "All Time" },
+  { key: "this-year", label: "This Year" },
+  { key: "last-12", label: "Last 12 Months" },
+  { key: "custom", label: "Custom Range" },
+];
 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 
@@ -188,6 +207,9 @@ export default function InsightsViewer() {
   const [state, setState] = useState<ViewerState>({ step: "idle" });
   const [password, setPassword] = useState("");
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
+  const [totalsFilter, setTotalsFilter] = useState<TotalsFilter>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const lockTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
   const resetLockTimer = useCallback(() => {
@@ -371,6 +393,63 @@ export default function InsightsViewer() {
     };
   }, [state]);
 
+  // All-Time Totals filtered rows
+  const totalsRows = useMemo(() => {
+    if (state.step !== "ready") return [];
+    const rows = state.rows;
+    if (totalsFilter === "all") return rows;
+    if (totalsFilter === "this-year") {
+      const year = new Date().getFullYear().toString();
+      return rows.filter((r) => r.payslipDate.startsWith(year));
+    }
+    if (totalsFilter === "last-12") {
+      const now = new Date();
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}`;
+      return rows.filter((r) => r.payslipDate >= cutoffStr);
+    }
+    // custom
+    return rows.filter((r) => {
+      if (customFrom && r.payslipDate < customFrom) return false;
+      if (customTo && r.payslipDate > customTo) return false;
+      return true;
+    });
+  }, [state, totalsFilter, customFrom, customTo]);
+
+  const totals = useMemo(() => {
+    const rows = totalsRows;
+    const empty = {
+      gross: 0, net: 0, deductions: 0, tax: 0,
+      uif: 0, pension: 0, medicalAid: 0, other: 0,
+      avgTaxRate: 0, takeHomeRate: 0,
+      months: 0, firstMonth: "", equivMonths: 0,
+    };
+    if (rows.length === 0) return empty;
+
+    let gross = 0, net = 0, tax = 0, uif = 0, pension = 0, medicalAid = 0, other = 0;
+    for (const r of rows) {
+      gross += r.data.grossPay;
+      net += r.data.netPay;
+      tax += r.data.paye;
+      uif += r.data.uif;
+      pension += r.data.pension;
+      medicalAid += r.data.medicalAid;
+      other += r.data.otherDeductions.reduce((s, d) => s + d.amount, 0);
+    }
+    const deductions = gross - net;
+    const avgNet = net / rows.length;
+
+    return {
+      gross, net, deductions, tax,
+      uif, pension, medicalAid, other,
+      avgTaxRate: gross > 0 ? (tax / gross) * 100 : 0,
+      takeHomeRate: gross > 0 ? (net / gross) * 100 : 0,
+      months: rows.length,
+      firstMonth: rows[0].payslipDate,
+      equivMonths: avgNet > 0 ? Math.round((deductions / avgNet) * 10) / 10 : 0,
+    };
+  }, [totalsRows]);
+
   const toggleMonth = useCallback((month: string) => {
     setSelectedMonths((prev) => {
       const next = new Set(prev);
@@ -486,6 +565,184 @@ export default function InsightsViewer() {
         {/* Charts & Data */}
         {state.step === "ready" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* All-Time Totals */}
+            <section className="mb-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <h2 className="font-heading text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+                  {totalsFilter === "all" ? "All-Time" : totalsFilter === "this-year" ? String(new Date().getFullYear()) : totalsFilter === "last-12" ? "Last 12 Months" : "Custom Range"} Totals
+                </h2>
+                <div className="flex flex-wrap gap-1.5">
+                  {TOTALS_FILTERS.map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => setTotalsFilter(f.key)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors border ${
+                        totalsFilter === f.key
+                          ? "bg-accent text-accent-foreground border-accent"
+                          : "bg-card text-muted-foreground border-border hover:border-accent/50"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom range inputs */}
+              {totalsFilter === "custom" && (
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground">From</label>
+                    <select
+                      value={customFrom}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                      className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
+                    >
+                      <option value="">Earliest</option>
+                      {state.step === "ready" && state.rows.map((r) => (
+                        <option key={r.payslipDate} value={r.payslipDate}>
+                          {formatMonth(r.payslipDate)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground">To</label>
+                    <select
+                      value={customTo}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                      className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
+                    >
+                      <option value="">Latest</option>
+                      {state.step === "ready" && [...state.rows].reverse().map((r) => (
+                        <option key={r.payslipDate} value={r.payslipDate}>
+                          {formatMonth(r.payslipDate)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {totals.months === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                    No payslips in the selected range.
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Tracking period */}
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Since {formatMonth(totals.firstMonth)} — {totals.months} payslip{totals.months !== 1 ? "s" : ""}
+                  </p>
+
+                  {/* Primary metrics */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-3">
+                    <Card>
+                      <CardContent className="flex flex-col items-center gap-1 p-4">
+                        <Wallet className="size-4 text-accent" />
+                        <span className="text-lg font-bold text-foreground tabular-nums">
+                          {formatZAR(totals.gross)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">Total Gross</span>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="flex flex-col items-center gap-1 p-4">
+                        <DollarSign className="size-4 text-green-600" />
+                        <span className="text-lg font-bold text-green-600 tabular-nums">
+                          {formatZAR(totals.net)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">Total Net</span>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="flex flex-col items-center gap-1 p-4">
+                        <Receipt className="size-4 text-red-500" />
+                        <span className="text-lg font-bold text-red-500 tabular-nums">
+                          {formatZAR(totals.deductions)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">Total Deductions</span>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="flex flex-col items-center gap-1 p-4">
+                        <BarChart3 className="size-4 text-orange-500" />
+                        <span className="text-lg font-bold text-orange-500 tabular-nums">
+                          {formatZAR(totals.tax)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">Total Tax (PAYE)</span>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Deduction details */}
+                  <Card className="mb-3">
+                    <CardContent className="p-4">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">Deduction Details</p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+                        <div>
+                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.uif)}</span>
+                          <p className="text-[11px] text-muted-foreground">UIF</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.pension)}</span>
+                          <p className="text-[11px] text-muted-foreground">Pension</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.medicalAid)}</span>
+                          <p className="text-[11px] text-muted-foreground">Medical Aid</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.other)}</span>
+                          <p className="text-[11px] text-muted-foreground">Other</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Derived metrics + insight */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-3">
+                    <Card>
+                      <CardContent className="flex flex-col items-center gap-1 p-4">
+                        <Percent className="size-4 text-accent" />
+                        <span className="text-lg font-bold tabular-nums text-foreground">
+                          {totals.avgTaxRate.toFixed(1)}%
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">Avg Tax Rate</span>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="flex flex-col items-center gap-1 p-4">
+                        <Percent className="size-4 text-green-600" />
+                        <span className="text-lg font-bold tabular-nums text-green-600">
+                          {totals.takeHomeRate.toFixed(1)}%
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">Take-Home Rate</span>
+                      </CardContent>
+                    </Card>
+                    <Card className="col-span-2 sm:col-span-1">
+                      <CardContent className="flex flex-col items-center gap-1 p-4">
+                        <Clock className="size-4 text-muted-foreground" />
+                        <span className="text-lg font-bold tabular-nums text-foreground">
+                          {totals.equivMonths}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground text-center">Months of net salary in deductions</span>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Contextual insight */}
+                  <div className="rounded-xl border border-border bg-card/50 px-4 py-3">
+                    <p className="text-sm text-muted-foreground">
+                      That&apos;s <span className="font-semibold text-foreground">{formatZAR(totals.deductions)}</span> you never saw — equivalent to <span className="font-semibold text-foreground">{totals.equivMonths} months</span> of your average net salary.
+                    </p>
+                  </div>
+                </>
+              )}
+            </section>
+
             {/* Summary cards */}
             <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
