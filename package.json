@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "npx trigger.dev@latest dev",
     "deploy": "npx trigger.dev@latest deploy",
-    "decrypt": "tsx scripts/decrypt.ts"
+    "decrypt": "tsx scripts/decrypt.ts",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@googleapis/drive": "^20.1.0",
