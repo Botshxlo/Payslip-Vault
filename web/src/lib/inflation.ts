@@ -1,11 +1,10 @@
-import cpiData from "@/data/sa-cpi.json";
-
-let cpiMap: Record<string, number> = cpiData as Record<string, number>;
-let sortedMonths = Object.keys(cpiMap).sort();
+let cpiMap: Record<string, number> = {};
+let sortedMonths: string[] = [];
 
 /**
- * Fetch CPI data from the API and update the module-level map.
- * Falls back to static JSON silently on failure.
+ * Fetch CPI data from the API and populate the module-level map.
+ * Must be called before using getLatestCPI / calculateRealValue / getCumulativeInflation.
+ * If the API call fails, CPI functions will return null (no data available).
  */
 export async function loadCPIData(): Promise<void> {
   try {
@@ -17,7 +16,7 @@ export async function loadCPIData(): Promise<void> {
       sortedMonths = Object.keys(cpiMap).sort();
     }
   } catch {
-    // Silently fall back to static data
+    // CPI functions will return null if data couldn't be loaded
   }
 }
 
