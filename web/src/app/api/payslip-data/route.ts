@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-utils";
-import { createClient } from "@libsql/client";
-
-function getTurso() {
-  return createClient({
-    url: process.env.TURSO_DATABASE_URL || "file:local.db",
-    authToken: process.env.TURSO_AUTH_TOKEN,
-  });
-}
+import { getTurso } from "@/lib/turso";
 
 export async function GET() {
   const authResult = await requireAuth();
