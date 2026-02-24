@@ -55,6 +55,7 @@ The result is a fully automated pipeline: email arrives, PDF is processed, encry
                     |                  Turso (LibSQL)                   |
                     |                                                    |
                     |  payslip_data: encrypted JSON blobs (base64)      |
+                    |  cpi_data: SA CPI index values (FRED)             |
                     |  session/user: auth tables (better-auth)          |
                     +--------------------+-----------------------------+
                                          |
@@ -113,19 +114,24 @@ The web app never sees your salary figures in plaintext:
 
 The `/insights` dashboard decrypts all payslip data client-side and renders:
 
-- **Net pay trend** — line chart showing take-home pay over time
+- **All-time totals** — cumulative gross, net, deductions, and tax with filterable date ranges (All Time, This Year, Last 12 Months, Custom Range), deduction breakdown, derived rates (avg tax, take-home %), and a contextual insight
+- **Inflation-adjusted pay** — real net pay trend line using SA CPI data (FRED series ZAFCPIALLMINMEI), auto-updated monthly via Trigger.dev
+- **Net pay trend** — line chart showing nominal and real take-home pay over time
 - **Deduction breakdown** — stacked bar chart (PAYE, UIF, pension, medical aid, etc.)
 - **Month-over-month changes** — bar chart showing percentage changes
 - **Detailed table** — every month's figures with change indicators
-- **Summary cards** — latest net pay, months tracked, average net pay
+- **Proof of income** — generate a PDF summary for selected months
+- **Summary cards** — latest net pay, months tracked, average net pay, real pay change
 
-### Daily Sync
+### Automated Sync
 
-A daily cron job reconciles the Turso database with Google Drive:
+**Daily payslip sync** reconciles the Turso database with Google Drive:
 
 - Files in Drive but not in Turso are ingested (downloaded, decrypted, parsed, re-encrypted, stored)
 - Rows in Turso for files deleted from Drive are removed
 - This ensures the insights dashboard always reflects what's actually in Drive
+
+**Monthly CPI sync** fetches South African Consumer Price Index data from the FRED API (series `ZAFCPIALLMINMEI`) on the 1st of each month and stores it in Turso, keeping inflation-adjusted pay calculations up to date automatically.
 
 ## Project Structure
 
@@ -135,7 +141,8 @@ payslip-vault/
 │   ├── trigger/                  # Trigger.dev scheduled tasks
 │   │   ├── poll-gmail.ts         # Cron: poll Gmail for new payslips
 │   │   ├── payslip.ts            # Process a single payslip end-to-end
-│   │   └── sync-payslip-data.ts  # Cron: reconcile Turso <-> Drive
+│   │   ├── sync-payslip-data.ts  # Cron: reconcile Turso <-> Drive
+│   │   └── sync-cpi-data.ts      # Cron: fetch SA CPI from FRED API monthly
 │   └── lib/                      # Shared libraries
 │       ├── gmail.ts              # Gmail API (find, extract, mark, trash)
 │       ├── storage.ts            # Google Drive API (upload, list, download)
@@ -145,10 +152,13 @@ payslip-vault/
 │       ├── payslip-store.ts      # Encrypted JSON storage in Turso
 │       ├── detect-changes.ts     # Month-over-month change detection
 │       ├── notify.ts             # Slack webhook notifications
+│       ├── fred.ts               # FRED API client (SA CPI data)
 │       └── turso.ts              # Turso/LibSQL client singleton
 ├── scripts/
 │   ├── inspect-payslip.ts        # Debug: view raw PDF text & parsed data
 │   ├── migrate.ts                # Create payslip_data table in Turso
+│   ├── migrate-cpi.ts            # Create cpi_data table in Turso
+│   ├── seed-cpi.ts               # Seed CPI data from static JSON
 │   ├── backfill.ts               # Backfill Turso from existing Drive files
 │   ├── import.ts                 # Manual payslip import from local PDFs
 │   └── decrypt.ts                # CLI decryption tool
@@ -164,9 +174,12 @@ payslip-vault/
 │       │       ├── auth/         # better-auth endpoints
 │       │       ├── files/        # List Drive files
 │       │       ├── file/[id]/    # Download single .enc file
-│       │       └── payslip-data/ # Encrypted JSON rows from Turso
+│       │       ├── payslip-data/ # Encrypted JSON rows from Turso
+│       │       └── cpi-data/    # CPI data from Turso for inflation tracking
 │       └── lib/
 │           ├── decrypt.ts        # Browser-side AES-256-GCM + scrypt
+│           ├── inflation.ts      # CPI-based inflation calculations
+│           ├── generate-proof-of-income.ts  # PDF proof of income generator
 │           ├── auth.ts           # better-auth server config
 │           └── auth-client.ts    # better-auth client
 ├── trigger.config.ts             # Trigger.dev build config
@@ -219,7 +232,9 @@ Payslip 2025-10-31 — Changes Detected
 | Authentication | [better-auth](https://better-auth.com) (Google OAuth) |
 | Browser crypto | Web Crypto API (`SubtleCrypto`) + `scrypt-js` |
 | Charts | [Recharts](https://recharts.org) |
+| PDF generation | [jsPDF](https://github.com/parallax/jsPDF) + jspdf-autotable |
 | PDF rendering | `react-pdf` (pdfjs-dist) |
+| Inflation data | [FRED API](https://fred.stlouisfed.org) (SA CPI series ZAFCPIALLMINMEI) |
 | UI | Tailwind CSS 4, shadcn/ui, Lucide icons |
 | Hosting | [Vercel](https://vercel.com) (web), Trigger.dev Cloud (worker) |
 | Notifications | Slack (incoming webhook) |
@@ -245,6 +260,7 @@ Payslip 2025-10-31 — Changes Detected
 | `VIEWER_BASE_URL` | Web app URL for payslip links |
 | `TURSO_DATABASE_URL` | Turso database connection |
 | `TURSO_AUTH_TOKEN` | Turso auth |
+| `FRED_API_KEY` | FRED API key (SA CPI data) |
 
 ### Web `web/.env.local`
 
@@ -266,7 +282,9 @@ npm run dev              # Start local dev mode
 npm run deploy           # Deploy to Trigger.dev cloud
 
 # Utilities
-npx tsx scripts/migrate.ts          # Create Turso table
+npx tsx scripts/migrate.ts          # Create payslip_data table
+npx tsx scripts/migrate-cpi.ts      # Create cpi_data table
+npx tsx scripts/seed-cpi.ts         # Seed CPI data from static JSON
 npx tsx scripts/backfill.ts         # Backfill Turso from Drive
 npx tsx scripts/import.ts           # Import local PDFs to Drive + Turso
 npx tsx scripts/inspect-payslip.ts  # Debug: view parsed payslip data
