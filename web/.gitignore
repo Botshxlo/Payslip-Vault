@@ -2,3 +2,6 @@
 .next
 node_modules
 local.db
+.env
+.env.local
+.env.production
