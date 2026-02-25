@@ -114,109 +114,25 @@ The web app never sees your salary figures in plaintext:
 
 The `/insights` dashboard decrypts all payslip data client-side and renders:
 
-- **All-time totals** — cumulative gross, net, deductions, and tax with filterable date ranges (All Time, This Year, Last 12 Months, Custom Range), deduction breakdown, derived rates (avg tax, take-home %), and a contextual insight
-- **Inflation-adjusted pay** — real net pay trend line using SA CPI data (FRED series ZAFCPIALLMINMEI), auto-updated monthly via Trigger.dev
+- **All-time totals** — cumulative gross, net, deductions, and tax with filterable date ranges
+- **Inflation-adjusted pay** — real net pay trend line using SA CPI data (FRED)
 - **Net pay trend** — line chart showing nominal and real take-home pay over time
 - **Deduction breakdown** — stacked bar chart (PAYE, UIF, pension, medical aid, etc.)
 - **Month-over-month changes** — bar chart showing percentage changes
 - **Detailed table** — every month's figures with change indicators
 - **Proof of income** — generate a PDF summary for selected months
-- **Summary cards** — latest net pay, months tracked, average net pay, real pay change
 
-### Automated Sync
+## Security Model
 
-**Daily payslip sync** reconciles the Turso database with Google Drive:
-
-- Files in Drive but not in Turso are ingested (downloaded, decrypted, parsed, re-encrypted, stored)
-- Rows in Turso for files deleted from Drive are removed
-- This ensures the insights dashboard always reflects what's actually in Drive
-
-**Monthly CPI sync** fetches South African Consumer Price Index data from the FRED API (series `ZAFCPIALLMINMEI`) on the 1st of each month and stores it in Turso, keeping inflation-adjusted pay calculations up to date automatically.
-
-## Project Structure
-
-```
-payslip-vault/
-├── src/
-│   ├── trigger/                  # Trigger.dev scheduled tasks
-│   │   ├── poll-gmail.ts         # Cron: poll Gmail for new payslips
-│   │   ├── payslip.ts            # Process a single payslip end-to-end
-│   │   ├── sync-payslip-data.ts  # Cron: reconcile Turso <-> Drive
-│   │   └── sync-cpi-data.ts      # Cron: fetch SA CPI from FRED API monthly
-│   └── lib/                      # Shared libraries
-│       ├── gmail.ts              # Gmail API (find, extract, mark, trash)
-│       ├── storage.ts            # Google Drive API (upload, list, download)
-│       ├── decrypt-pdf.ts        # Strip PDF password via qpdf
-│       ├── encrypt.ts            # AES-256-GCM encrypt/decrypt
-│       ├── parse-payslip.ts      # PDF text extraction & SimplePay parser
-│       ├── payslip-store.ts      # Encrypted JSON storage in Turso
-│       ├── detect-changes.ts     # Month-over-month change detection
-│       ├── notify.ts             # Slack webhook notifications
-│       ├── fred.ts               # FRED API client (SA CPI data)
-│       └── turso.ts              # Turso/LibSQL client singleton
-├── scripts/
-│   ├── inspect-payslip.ts        # Debug: view raw PDF text & parsed data
-│   ├── migrate.ts                # Create payslip_data table in Turso
-│   ├── migrate-cpi.ts            # Create cpi_data table in Turso
-│   ├── seed-cpi.ts               # Seed CPI data from static JSON
-│   ├── backfill.ts               # Backfill Turso from existing Drive files
-│   ├── import.ts                 # Manual payslip import from local PDFs
-│   └── decrypt.ts                # CLI decryption tool
-├── web/                          # Next.js 15 app (Vercel)
-│   └── src/
-│       ├── app/
-│       │   ├── page.tsx          # Landing page
-│       │   ├── login/            # Google OAuth login
-│       │   ├── history/          # Payslip list from Drive
-│       │   ├── view/[fileId]/    # Single payslip PDF viewer
-│       │   ├── insights/         # Salary trends dashboard
-│       │   └── api/
-│       │       ├── auth/         # better-auth endpoints
-│       │       ├── files/        # List Drive files
-│       │       ├── file/[id]/    # Download single .enc file
-│       │       ├── payslip-data/ # Encrypted JSON rows from Turso
-│       │       └── cpi-data/    # CPI data from Turso for inflation tracking
-│       └── lib/
-│           ├── decrypt.ts        # Browser-side AES-256-GCM + scrypt
-│           ├── inflation.ts      # CPI-based inflation calculations
-│           ├── generate-proof-of-income.ts  # PDF proof of income generator
-│           ├── auth.ts           # better-auth server config
-│           └── auth-client.ts    # better-auth client
-├── trigger.config.ts             # Trigger.dev build config
-├── .dockerignore                 # Exclude web/ from worker builds
-└── CLAUDE.md                     # AI development instructions
-```
-
-## Encryption Format
-
-All encrypted data (both `.enc` files and JSON blobs) uses the same binary format:
-
-```
-[salt: 16 bytes] [iv: 12 bytes] [authTag: 16 bytes] [ciphertext: variable]
-```
-
-| Component | Details |
-|-----------|---------|
-| Algorithm | AES-256-GCM |
-| Key derivation | scrypt (N=16384, r=8, p=1) |
-| Salt | 16 random bytes per encryption |
-| IV | 12 random bytes per encryption |
-| Auth tag | 16 bytes (GCM integrity check) |
-
-The server uses Node.js `crypto.scryptSync` + `createCipheriv`. The browser uses `scrypt-js` + `SubtleCrypto`. Parameters are identical on both sides — changing either breaks decryption silently at the GCM auth step.
-
-## Slack Notifications
-
-Slack alerts are privacy-conscious — they show **percentage changes only**, never absolute amounts:
-
-```
-Payslip 2025-10-31 — Changes Detected
-
-  Net Pay         ↑ 4.7%
-  PAYE            ↑ 3.2%
-  Basic Salary    ↑ 6.0%
-  Pension Fund    (new)
-```
+| Threat | Mitigation |
+|--------|-----------|
+| Drive account compromised | Files are AES-256-GCM encrypted; attacker sees only `.enc` blobs |
+| Database compromised | Turso stores encrypted JSON (base64); no plaintext salary data |
+| Server compromised | Vault password never touches the server; decryption is browser-only |
+| Slack message intercepted | Only percentage changes are shown, never absolute amounts |
+| Session hijacked | Google OAuth via better-auth; protected API routes check session |
+| Brute-force password | scrypt key derivation (N=16384) makes brute-force expensive |
+| Unattended browser | Auto-lock after 5 minutes clears all decrypted data from memory |
 
 ## Tech Stack
 
@@ -232,101 +148,12 @@ Payslip 2025-10-31 — Changes Detected
 | Authentication | [better-auth](https://better-auth.com) (Google OAuth) |
 | Browser crypto | Web Crypto API (`SubtleCrypto`) + `scrypt-js` |
 | Charts | [Recharts](https://recharts.org) |
-| PDF generation | [jsPDF](https://github.com/parallax/jsPDF) + jspdf-autotable |
-| PDF rendering | `react-pdf` (pdfjs-dist) |
 | Inflation data | [FRED API](https://fred.stlouisfed.org) (SA CPI series ZAFCPIALLMINMEI) |
 | UI | Tailwind CSS 4, shadcn/ui, Lucide icons |
 | Hosting | [Vercel](https://vercel.com) (web), Trigger.dev Cloud (worker) |
 | Notifications | Slack (incoming webhook) |
 
-## Environment Variables
-
-### Root `.env` (Trigger.dev worker)
-
-| Variable | Purpose |
-|----------|---------|
-| `TRIGGER_SECRET_KEY` | Trigger.dev project auth |
-| `ID_NUMBER` | Employee ID (PDF password) |
-| `VAULT_SECRET` | AES-256-GCM encryption passphrase |
-| `GMAIL_CLIENT_ID` | Gmail OAuth2 |
-| `GMAIL_CLIENT_SECRET` | Gmail OAuth2 |
-| `GMAIL_REDIRECT_URI` | Gmail OAuth2 |
-| `GMAIL_REFRESH_TOKEN` | Gmail OAuth2 |
-| `GOOGLE_CLIENT_ID` | Drive OAuth2 |
-| `GOOGLE_CLIENT_SECRET` | Drive OAuth2 |
-| `GOOGLE_REDIRECT_URI` | Drive OAuth2 |
-| `GOOGLE_REFRESH_TOKEN` | Drive OAuth2 |
-| `SLACK_WEBHOOK_URL` | Slack notifications |
-| `VIEWER_BASE_URL` | Web app URL for payslip links |
-| `TURSO_DATABASE_URL` | Turso database connection |
-| `TURSO_AUTH_TOKEN` | Turso auth |
-| `FRED_API_KEY` | FRED API key (SA CPI data) |
-
-### Web `web/.env.local`
-
-| Variable | Purpose |
-|----------|---------|
-| `GOOGLE_CLIENT_ID` | Drive OAuth2 (same as root) |
-| `GOOGLE_CLIENT_SECRET` | Drive OAuth2 |
-| `GOOGLE_REDIRECT_URI` | Drive OAuth2 |
-| `GOOGLE_REFRESH_TOKEN` | Drive OAuth2 |
-| `TURSO_DATABASE_URL` | Turso database (shared with root) |
-| `TURSO_AUTH_TOKEN` | Turso auth |
-| `BETTER_AUTH_SECRET` | Session signing key |
-
-## Scripts
-
-```bash
-# Root (Trigger.dev worker)
-npm run dev              # Start local dev mode
-npm run deploy           # Deploy to Trigger.dev cloud
-
-# Utilities
-npx tsx scripts/migrate.ts          # Create payslip_data table
-npx tsx scripts/migrate-cpi.ts      # Create cpi_data table
-npx tsx scripts/seed-cpi.ts         # Seed CPI data from static JSON
-npx tsx scripts/backfill.ts         # Backfill Turso from Drive
-npx tsx scripts/import.ts           # Import local PDFs to Drive + Turso
-npx tsx scripts/inspect-payslip.ts  # Debug: view parsed payslip data
-npx tsx scripts/decrypt.ts <file>   # Decrypt a .enc file to PDF
-
-# Web (from web/ directory)
-npm run dev              # Next.js dev server
-npm run build            # Production build
-vercel --yes --prod      # Deploy to Vercel
-```
-
-## Payslip Parser
-
-The parser handles SimplePay (South Africa) payslip PDFs with a section-based approach:
-
-```
-Income         [Current]  [YTD]     <- gross pay
-  Basic Salary [Current]  [YTD]
-Allowance      [Current]  [YTD]     <- optional section
-  Travel       [Current]  [YTD]
-Deduction      [Current]  [YTD]     <- total deductions
-  UIF          [Current]  [YTD]
-  Tax (PAYE)   [Current]  [YTD]
-Employer Contribution ...
-Benefit        ...
-NETT PAY       R xx,xxx.xx
-```
-
-It also supports **merged PDFs** — if multiple payslips are combined into one file (e.g. a mid-month and end-of-month payslip), the parser splits on `NETT PAY` boundaries and sums the results.
-
-## Security Model
-
-| Threat | Mitigation |
-|--------|-----------|
-| Drive account compromised | Files are AES-256-GCM encrypted; attacker sees only `.enc` blobs |
-| Database compromised | Turso stores encrypted JSON (base64); no plaintext salary data |
-| Server compromised | Vault password never touches the server; decryption is browser-only |
-| Slack message intercepted | Only percentage changes are shown, never absolute amounts |
-| Session hijacked | Google OAuth via better-auth; protected API routes check session |
-| Brute-force password | scrypt key derivation (N=16384) makes brute-force expensive |
-| Unattended browser | Auto-lock after 5 minutes clears all decrypted data from memory |
-| Stale password in DOM | Password is cleared from React state immediately on submit |
+See [CLAUDE.md](CLAUDE.md) for development setup, commands, and environment variables.
 
 ## License
 

@@ -26,7 +26,11 @@ npm run deploy       # Deploy tasks to Trigger.dev cloud
 npm run decrypt      # CLI: tsx scripts/decrypt.ts <file.enc> [output.pdf]
 tsx scripts/inspect-payslip.ts   # Print raw text from a payslip PDF
 tsx scripts/migrate.ts           # Create payslip_data table in Turso
+tsx scripts/migrate-cpi.ts       # Create cpi_data table in Turso
+tsx scripts/migrate-status.ts    # Create system_status table in Turso
+tsx scripts/seed-cpi.ts          # Seed CPI data from static JSON fallback
 tsx scripts/backfill.ts          # Backfill existing Drive payslips into Turso
+tsx scripts/get-token.ts         # Generate OAuth refresh tokens
 ```
 
 ### Web (Next.js app, run from `web/`)
@@ -71,10 +75,10 @@ Binary layout of `.enc` files — must stay in sync between `src/lib/encrypt.ts`
 ## Environment Variables
 
 ### Root `.env`
-`TRIGGER_SECRET_KEY`, `ID_NUMBER` (PDF password), `VAULT_SECRET` (encryption passphrase), `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REDIRECT_URI`, `GMAIL_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN`, `SLACK_WEBHOOK_URL`, `VIEWER_BASE_URL`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
+`TRIGGER_SECRET_KEY`, `ID_NUMBER` (PDF password), `VAULT_SECRET` (encryption passphrase), `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REDIRECT_URI`, `GMAIL_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN`, `SLACK_WEBHOOK_URL`, `VIEWER_BASE_URL`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `FRED_API_KEY`
 
 ### Web `web/.env.local`
-`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN` (same Drive credentials as root; no Gmail creds needed)
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN` (same Drive credentials as root; no Gmail creds needed), `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `BETTER_AUTH_SECRET`
 
 ## Deployment
 - **Worker**: Trigger.dev cloud (`npm run deploy`), project `proj_nyvrmpbepxfkjcuzmirx`
