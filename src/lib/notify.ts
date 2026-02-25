@@ -169,6 +169,106 @@ export async function notifyPayslipChanges(
   }
 }
 
+export async function notifyHealthAlert(alerts: string[]): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) throw new Error("SLACK_WEBHOOK_URL is not set");
+
+  const body = {
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "Health Check Alert",
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: alerts.join("\n"),
+        },
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: "Dead man's switch triggered \u00b7 Check Trigger.dev dashboard",
+          },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Slack webhook failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+export async function notifyBackup(
+  filename: string,
+  payslipCount: number,
+  cpiCount: number
+): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) throw new Error("SLACK_WEBHOOK_URL is not set");
+
+  const now = new Date().toLocaleString("en-ZA", {
+    timeZone: "Africa/Johannesburg",
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+
+  const body = {
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "Database Backup Complete",
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: `*File:*\n${filename}` },
+          { type: "mrkdwn", text: `*Backed Up:*\n${now}` },
+          { type: "mrkdwn", text: `*Payslips:*\n${payslipCount} rows` },
+          { type: "mrkdwn", text: `*CPI Data:*\n${cpiCount} rows` },
+        ],
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: "Encrypted with AES-256-GCM \u00b7 Stored in Google Drive",
+          },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Slack webhook failed: ${res.status} ${await res.text()}`);
+  }
+}
+
 export async function notifyTokenWarning(message: string): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   if (!webhookUrl) throw new Error("SLACK_WEBHOOK_URL is not set");

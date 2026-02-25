@@ -87,6 +87,12 @@ export const syncPayslipData = schedules.task({
       }
     }
 
+    // Write heartbeat
+    await db.execute({
+      sql: `INSERT OR REPLACE INTO system_status (key, value, updated_at) VALUES (?, ?, ?)`,
+      args: ["last_payslip_sync", "ok", new Date().toISOString()],
+    });
+
     logger.info("Sync complete", {
       driveFiles: driveFiles.length,
       added,

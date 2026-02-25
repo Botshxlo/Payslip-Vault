@@ -23,6 +23,12 @@ export const syncCpiData = schedules.task({
         upserted++;
       }
 
+      // Write heartbeat
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO system_status (key, value, updated_at) VALUES (?, ?, ?)`,
+        args: ["last_cpi_sync", "ok", new Date().toISOString()],
+      });
+
       logger.info("CPI sync complete", { upserted });
       return { upserted };
     } catch (err) {
