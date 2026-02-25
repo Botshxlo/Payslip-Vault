@@ -111,6 +111,17 @@ export async function listVaultFiles(): Promise<drive_v3.Schema$File[]> {
 }
 
 /**
+ * Move a file to the Drive trash (recoverable, not hard delete).
+ */
+export async function trashDriveFile(fileId: string): Promise<void> {
+  const drive = getDrive();
+  await drive.files.update({
+    fileId,
+    requestBody: { trashed: true },
+  });
+}
+
+/**
  * Download a file's content from Drive as a Buffer.
  */
 export async function downloadEncFile(fileId: string): Promise<Buffer> {
