@@ -110,6 +110,80 @@ export async function listVaultFiles(): Promise<drive_v3.Schema$File[]> {
   return files;
 }
 
+let backupFolderId: string | null = null;
+
+async function getOrCreateBackupFolder(
+  drive: drive_v3.Drive
+): Promise<string> {
+  if (backupFolderId) return backupFolderId;
+
+  const res = await drive.files.list({
+    q: "name='Payslip Vault Backups' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+    fields: "files(id)",
+    spaces: "drive",
+  });
+
+  if (res.data.files && res.data.files.length > 0) {
+    backupFolderId = res.data.files[0].id!;
+    return backupFolderId;
+  }
+
+  const folder = await drive.files.create({
+    requestBody: {
+      name: "Payslip Vault Backups",
+      mimeType: "application/vnd.google-apps.folder",
+    },
+    fields: "id",
+  });
+
+  backupFolderId = folder.data.id!;
+  return backupFolderId;
+}
+
+export async function uploadBackupToDrive(
+  data: Buffer,
+  filename: string
+): Promise<drive_v3.Schema$File> {
+  const drive = getDrive();
+  const folderId = await getOrCreateBackupFolder(drive);
+
+  const res = await drive.files.create({
+    requestBody: {
+      name: filename,
+      parents: [folderId],
+    },
+    media: {
+      mimeType: "application/octet-stream",
+      body: Readable.from(data),
+    },
+    fields: "id,name",
+  });
+
+  return res.data;
+}
+
+export async function listBackupFiles(): Promise<drive_v3.Schema$File[]> {
+  const drive = getDrive();
+  const folderId = await getOrCreateBackupFolder(drive);
+
+  const files: drive_v3.Schema$File[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const res = await drive.files.list({
+      q: `'${folderId}' in parents and trashed=false`,
+      fields: "nextPageToken, files(id, name)",
+      spaces: "drive",
+      pageSize: 100,
+      pageToken,
+    });
+    files.push(...(res.data.files ?? []));
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  return files;
+}
+
 /**
  * Move a file to the Drive trash (recoverable, not hard delete).
  */

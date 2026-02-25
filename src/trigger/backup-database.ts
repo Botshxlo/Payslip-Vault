@@ -2,8 +2,8 @@ import { schedules, logger } from "@trigger.dev/sdk/v3";
 import { getTursoClient } from "../lib/turso.js";
 import { encryptBuffer } from "../lib/encrypt.js";
 import {
-  uploadToGoogleDrive,
-  listVaultFiles,
+  uploadBackupToDrive,
+  listBackupFiles,
   trashDriveFile,
 } from "../lib/storage.js";
 import { notifyBackup } from "../lib/notify.js";
@@ -45,14 +45,14 @@ export const backupDatabase = schedules.task({
     const date = new Date().toISOString().split("T")[0];
     const filename = `backup-${date}.enc`;
     logger.info("Uploading backup to Drive", { filename });
-    await uploadToGoogleDrive(encrypted, filename);
+    await uploadBackupToDrive(encrypted, filename);
 
     // 4. Trash old backups (older than BACKUP_RETENTION_WEEKS)
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - BACKUP_RETENTION_WEEKS * 7);
     const cutoffStr = cutoffDate.toISOString().split("T")[0];
 
-    const allFiles = await listVaultFiles();
+    const allFiles = await listBackupFiles();
     const oldBackups = allFiles.filter((f) => {
       if (!f.name?.startsWith("backup-")) return false;
       const dateMatch = f.name.match(/backup-(\d{4}-\d{2}-\d{2})\.enc/);
