@@ -75,7 +75,7 @@ type ViewerState =
   | { step: "ready"; rows: DecryptedRow[] }
   | { step: "error"; message: string };
 
-type TotalsFilter = "all" | "this-year" | "last-12" | "custom";
+type TotalsFilter = "all" | "this-year" | "last-12" | "tax-year" | "custom";
 
 interface TotalsFilterOption {
   key: TotalsFilter;
@@ -86,6 +86,7 @@ const TOTALS_FILTERS: TotalsFilterOption[] = [
   { key: "all", label: "All Time" },
   { key: "this-year", label: "This Year" },
   { key: "last-12", label: "Last 12 Months" },
+  { key: "tax-year", label: "Tax Year" },
   { key: "custom", label: "Custom Range" },
 ];
 
@@ -210,6 +211,7 @@ export default function InsightsViewer() {
   const [totalsFilter, setTotalsFilter] = useState<TotalsFilter>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [selectedTaxYear, setSelectedTaxYear] = useState<number | null>(null);
   const lockTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
   const resetLockTimer = useCallback(() => {
@@ -393,6 +395,24 @@ export default function InsightsViewer() {
     };
   }, [state]);
 
+  // SA tax years: March to February (e.g. 2025 = Mar 2025 – Feb 2026)
+  const availableTaxYears = useMemo(() => {
+    if (state.step !== "ready") return [];
+    const years = new Set<number>();
+    for (const r of state.rows) {
+      const [y, m] = r.payslipDate.split("-").map(Number);
+      // Jan/Feb belong to the previous tax year
+      years.add(m <= 2 ? y - 1 : y);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [state]);
+
+  // Auto-select current tax year on first click
+  const currentTaxYear = useMemo(() => {
+    const now = new Date();
+    return now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear();
+  }, []);
+
   // All-Time Totals filtered rows
   const totalsRows = useMemo(() => {
     if (state.step !== "ready") return [];
@@ -408,13 +428,19 @@ export default function InsightsViewer() {
       const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}`;
       return rows.filter((r) => r.payslipDate >= cutoffStr);
     }
+    if (totalsFilter === "tax-year") {
+      const ty = selectedTaxYear ?? currentTaxYear;
+      const from = `${ty}-03`;
+      const to = `${ty + 1}-03`;
+      return rows.filter((r) => r.payslipDate >= from && r.payslipDate < to);
+    }
     // custom
     return rows.filter((r) => {
       if (customFrom && r.payslipDate < customFrom) return false;
       if (customTo && r.payslipDate > customTo) return false;
       return true;
     });
-  }, [state, totalsFilter, customFrom, customTo]);
+  }, [state, totalsFilter, customFrom, customTo, selectedTaxYear, currentTaxYear]);
 
   const totals = useMemo(() => {
     const rows = totalsRows;
@@ -569,7 +595,7 @@ export default function InsightsViewer() {
             <section className="mb-8">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h2 className="font-heading text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                  {totalsFilter === "all" ? "All-Time" : totalsFilter === "this-year" ? String(new Date().getFullYear()) : totalsFilter === "last-12" ? "Last 12 Months" : "Custom Range"} Totals
+                  {totalsFilter === "all" ? "All-Time" : totalsFilter === "this-year" ? String(new Date().getFullYear()) : totalsFilter === "last-12" ? "Last 12 Months" : totalsFilter === "tax-year" ? `Tax Year ${selectedTaxYear ?? currentTaxYear}/${((selectedTaxYear ?? currentTaxYear) + 1).toString().slice(-2)}` : "Custom Range"} Totals
                 </h2>
                 <div className="flex flex-wrap gap-1.5">
                   {TOTALS_FILTERS.map((f) => (
@@ -587,6 +613,24 @@ export default function InsightsViewer() {
                   ))}
                 </div>
               </div>
+
+              {/* Tax year selector */}
+              {totalsFilter === "tax-year" && (
+                <div className="flex items-center gap-2 mb-4">
+                  <label className="text-xs text-muted-foreground">Tax Year</label>
+                  <select
+                    value={selectedTaxYear ?? currentTaxYear}
+                    onChange={(e) => setSelectedTaxYear(Number(e.target.value))}
+                    className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
+                  >
+                    {availableTaxYears.map((y) => (
+                      <option key={y} value={y}>
+                        Mar {y} – Feb {y + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Custom range inputs */}
               {totalsFilter === "custom" && (
