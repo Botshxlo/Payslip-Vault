@@ -19,6 +19,7 @@ import {
   Clock,
   ChevronRight,
   TrendingUp,
+  Landmark,
 } from "lucide-react";
 
 interface PayslipFile {
@@ -238,6 +239,17 @@ export default function HistoryPage() {
               <Link href="/insights">
                 <TrendingUp className="size-4" />
                 <span className="hidden sm:inline">Insights</span>
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              asChild
+            >
+              <Link href="/wealth">
+                <Landmark className="size-4" />
+                <span className="hidden sm:inline">Wealth</span>
               </Link>
             </Button>
             <Button
