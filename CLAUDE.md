@@ -80,6 +80,18 @@ Binary layout of `.enc` files — must stay in sync between `src/lib/encrypt.ts`
 ### Web `web/.env.local`
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_REFRESH_TOKEN` (same Drive credentials as root; no Gmail creds needed), `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `BETTER_AUTH_SECRET`
 
+## Git
+- Never add co-author tags or attribution to commits unless explicitly asked.
+- Commit incrementally after each completed feature or fix, and deploy when asked or when a logical milestone is reached. Don't wait to be told.
+
+## Development
+- When starting the dev server, always use port 3000 unless told otherwise. If the port is in use, kill the existing process first.
+- Always clear `.next` cache after installing new packages.
+
+## Testing / Validation
+- After making changes, run `npx tsc --noEmit` to check for TypeScript build errors before committing. Fix all type errors before moving on.
+
 ## Deployment
 - **Worker**: Trigger.dev cloud (`npm run deploy`), project `proj_nyvrmpbepxfkjcuzmirx`
 - **Web**: Vercel at `https://payslip-vault.vercel.app`, deployed from `web/` directory
+- When setting environment variables on Vercel, warn the user to check for trailing newlines. Prefer setting env vars via the Vercel dashboard rather than CLI when possible.
