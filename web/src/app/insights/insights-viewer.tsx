@@ -16,7 +16,6 @@ import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  Calendar,
   BarChart3,
   Activity,
   FileDown,
@@ -25,6 +24,8 @@ import {
   Percent,
   Clock,
   ChevronDown,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { generateProofOfIncome } from "@/lib/generate-proof-of-income";
@@ -204,6 +205,16 @@ function DecryptionAnimation({
   );
 }
 
+function SectionHeader({ title, id }: { title: string; id?: string }) {
+  return (
+    <div id={id} className="mt-10 mb-4 border-t border-border pt-6 first:mt-0 first:border-0 first:pt-0">
+      <h2 className="font-heading text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+        {title}
+      </h2>
+    </div>
+  );
+}
+
 export default function InsightsViewer() {
   const [state, setState] = useState<ViewerState>({ step: "idle" });
   const [password, setPassword] = useState("");
@@ -212,7 +223,19 @@ export default function InsightsViewer() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [selectedTaxYear, setSelectedTaxYear] = useState<number | null>(null);
+  const [isDark, setIsDark] = useState(true);
   const lockTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  }, [isDark]);
 
   const resetLockTimer = useCallback(() => {
     if (lockTimer.current) clearTimeout(lockTimer.current);
@@ -497,7 +520,7 @@ export default function InsightsViewer() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 sm:px-6">
           <Button
             variant="ghost"
@@ -518,7 +541,25 @@ export default function InsightsViewer() {
             </span>
           </div>
 
-          <Button
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </Button>
+            {state.step === "ready" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.getElementById("proof-of-income")?.scrollIntoView({ behavior: "smooth" })}
+              >
+                <FileDown className="size-4" />
+              </Button>
+            )}
+            <Button
             variant="ghost"
             size="sm"
             className="gap-2 text-muted-foreground hover:text-foreground"
@@ -527,6 +568,7 @@ export default function InsightsViewer() {
             <LogOut className="size-4" />
             <span className="hidden sm:inline">Sign out</span>
           </Button>
+          </div>
         </div>
       </header>
 
@@ -591,8 +633,8 @@ export default function InsightsViewer() {
         {/* Charts & Data */}
         {state.step === "ready" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* All-Time Totals */}
-            <section className="mb-8">
+            {/* Filter bar */}
+            <section className="sticky top-[52px] z-20 -mx-4 mb-2 bg-background px-4 pb-2 pt-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h2 className="font-heading text-sm font-semibold uppercase tracking-widest text-muted-foreground">
                   {totalsFilter === "all" ? "All-Time" : totalsFilter === "this-year" ? String(new Date().getFullYear()) : totalsFilter === "last-12" ? "Last 12 Months" : totalsFilter === "tax-year" ? `Tax Year ${selectedTaxYear ?? currentTaxYear}/${((selectedTaxYear ?? currentTaxYear) + 1).toString().slice(-2)}` : "Custom Range"} Totals
@@ -643,7 +685,7 @@ export default function InsightsViewer() {
                       className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
                     >
                       <option value="">Earliest</option>
-                      {state.step === "ready" && state.rows.map((r) => (
+                      {state.rows.map((r) => (
                         <option key={r.payslipDate} value={r.payslipDate}>
                           {formatMonth(r.payslipDate)}
                         </option>
@@ -658,7 +700,7 @@ export default function InsightsViewer() {
                       className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
                     >
                       <option value="">Latest</option>
-                      {state.step === "ready" && [...state.rows].reverse().map((r) => (
+                      {[...state.rows].reverse().map((r) => (
                         <option key={r.payslipDate} value={r.payslipDate}>
                           {formatMonth(r.payslipDate)}
                         </option>
@@ -667,228 +709,467 @@ export default function InsightsViewer() {
                   </div>
                 </div>
               )}
-
-              {totals.months === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                    No payslips in the selected range.
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  {/* Tracking period */}
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Since {formatMonth(totals.firstMonth)} — {totals.months} payslip{totals.months !== 1 ? "s" : ""}
-                  </p>
-
-                  {/* Primary metrics */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-3">
-                    <Card>
-                      <CardContent className="flex flex-col items-center gap-1 p-4">
-                        <Wallet className="size-4 text-accent" />
-                        <span className="text-lg font-bold text-foreground tabular-nums">
-                          {formatZAR(totals.gross)}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">Total Gross</span>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="flex flex-col items-center gap-1 p-4">
-                        <DollarSign className="size-4 text-green-600" />
-                        <span className="text-lg font-bold text-green-600 tabular-nums">
-                          {formatZAR(totals.net)}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">Total Net</span>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="flex flex-col items-center gap-1 p-4">
-                        <Receipt className="size-4 text-red-500" />
-                        <span className="text-lg font-bold text-red-500 tabular-nums">
-                          {formatZAR(totals.deductions)}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">Total Deductions</span>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="flex flex-col items-center gap-1 p-4">
-                        <BarChart3 className="size-4 text-orange-500" />
-                        <span className="text-lg font-bold text-orange-500 tabular-nums">
-                          {formatZAR(totals.tax)}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">Total Tax (PAYE)</span>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Deduction details */}
-                  <Card className="mb-3">
-                    <CardContent className="p-4">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">Deduction Details</p>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
-                        <div>
-                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.uif)}</span>
-                          <p className="text-[11px] text-muted-foreground">UIF</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.pension)}</span>
-                          <p className="text-[11px] text-muted-foreground">Pension</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.medicalAid)}</span>
-                          <p className="text-[11px] text-muted-foreground">Medical Aid</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.other)}</span>
-                          <p className="text-[11px] text-muted-foreground">Other</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Derived metrics + insight */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-3">
-                    <Card>
-                      <CardContent className="flex flex-col items-center gap-1 p-4">
-                        <Percent className="size-4 text-accent" />
-                        <span className="text-lg font-bold tabular-nums text-foreground">
-                          {totals.avgTaxRate.toFixed(1)}%
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">Avg Tax Rate</span>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="flex flex-col items-center gap-1 p-4">
-                        <Percent className="size-4 text-green-600" />
-                        <span className="text-lg font-bold tabular-nums text-green-600">
-                          {totals.takeHomeRate.toFixed(1)}%
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">Take-Home Rate</span>
-                      </CardContent>
-                    </Card>
-                    <Card className="col-span-2 sm:col-span-1">
-                      <CardContent className="flex flex-col items-center gap-1 p-4">
-                        <Clock className="size-4 text-muted-foreground" />
-                        <span className="text-lg font-bold tabular-nums text-foreground">
-                          {totals.equivMonths}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground text-center">Months of net salary in deductions</span>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Contextual insight */}
-                  <div className="rounded-xl border border-border bg-card/50 px-4 py-3">
-                    <p className="text-sm text-muted-foreground">
-                      That&apos;s <span className="font-semibold text-foreground">{formatZAR(totals.deductions)}</span> you never saw — equivalent to <span className="font-semibold text-foreground">{totals.equivMonths} months</span> of your average net salary.
-                    </p>
-                  </div>
-                </>
-              )}
             </section>
 
-            {/* Summary cards */}
-            <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
-                <DollarSign className="size-4 text-accent" />
-                <span className="text-lg font-bold text-foreground">
-                  {formatZAR(summary.latestNet)}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Latest Net
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
-                <Calendar className="size-4 text-accent" />
-                <span className="text-lg font-bold tabular-nums text-foreground">
-                  {summary.months}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Months
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
-                <BarChart3 className="size-4 text-accent" />
-                <span className="text-lg font-bold text-foreground">
-                  {formatZAR(summary.avgNet)}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Avg Net
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
-                <Activity className="size-4 text-accent" />
-                <span
-                  className={`text-lg font-bold tabular-nums ${
-                    summary.realPayChange !== null
-                      ? summary.realPayChange > 0
-                        ? "text-green-600"
-                        : summary.realPayChange < 0
-                          ? "text-red-500"
-                          : "text-foreground"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {summary.realPayChange !== null ? (
-                    <span className="inline-flex items-center gap-1">
-                      {summary.realPayChange > 0 ? (
-                        <TrendingUp className="size-3" />
-                      ) : summary.realPayChange < 0 ? (
-                        <TrendingDown className="size-3" />
-                      ) : null}
-                      {summary.realPayChange > 0 ? "+" : ""}
-                      {summary.realPayChange}%
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Real Pay Change
-                </span>
-              </div>
-            </div>
-
-            {/* Proof of Income */}
-            <section className="mb-8">
-              <h2 className="font-heading mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Proof of Income
-              </h2>
+            {totals.months === 0 ? (
               <Card>
-                <CardContent className="pt-4">
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (state.step !== "ready") return;
-                        const last3 = state.rows.slice(-3).map((r) => r.payslipDate);
-                        setSelectedMonths(new Set(last3));
-                      }}
-                    >
-                      Last 3
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (state.step !== "ready") return;
-                        setSelectedMonths(new Set(state.rows.map((r) => r.payslipDate)));
-                      }}
-                    >
-                      All
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedMonths(new Set())}
-                    >
-                      Clear
-                    </Button>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  No payslips in the selected range.
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* ── 2. Your Pay at a Glance — Hero KPIs ── */}
+                <SectionHeader title="Your Pay at a Glance" />
+                <p className="text-xs text-muted-foreground mb-3">
+                  Since {formatMonth(totals.firstMonth)} — {totals.months} payslip{totals.months !== 1 ? "s" : ""}
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
+                    <DollarSign className="size-4 text-accent" />
+                    <span className="text-lg font-bold text-foreground">
+                      {formatZAR(summary.latestNet)}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Latest Net
+                    </span>
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {state.step === "ready" &&
-                      state.rows.map((r) => {
+                  <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
+                    <BarChart3 className="size-4 text-accent" />
+                    <span className="text-lg font-bold text-foreground">
+                      {formatZAR(summary.avgNet)}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Avg Net
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
+                    <Percent className="size-4 text-green-600" />
+                    <span className="text-lg font-bold tabular-nums text-green-600">
+                      {totals.takeHomeRate.toFixed(1)}%
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Take-Home Rate
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-4">
+                    <Activity className="size-4 text-accent" />
+                    <span
+                      className={`text-lg font-bold tabular-nums ${
+                        summary.realPayChange !== null
+                          ? summary.realPayChange > 0
+                            ? "text-green-600"
+                            : summary.realPayChange < 0
+                              ? "text-red-500"
+                              : "text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {summary.realPayChange !== null ? (
+                        <span className="inline-flex items-center gap-1">
+                          {summary.realPayChange > 0 ? (
+                            <TrendingUp className="size-3" />
+                          ) : summary.realPayChange < 0 ? (
+                            <TrendingDown className="size-3" />
+                          ) : null}
+                          {summary.realPayChange > 0 ? "+" : ""}
+                          {summary.realPayChange}%
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Real Pay Change
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── 3. Pay Over Time — Pay Trend chart ── */}
+                <SectionHeader title="Pay Over Time" />
+                <Card>
+                  <CardContent className="pt-4">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={netPayData}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--color-border)"
+                        />
+                        <XAxis
+                          dataKey="month"
+                          tick={{ fontSize: 12 }}
+                          stroke="var(--color-muted-foreground)"
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12 }}
+                          stroke="var(--color-muted-foreground)"
+                          tickFormatter={(v) =>
+                            `R${(v / 1000).toFixed(0)}k`
+                          }
+                        />
+                        <Tooltip
+                          formatter={(value) => formatZAR(value as number)}
+                          contentStyle={{
+                            backgroundColor: "var(--color-card)",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "8px",
+                            fontSize: "13px",
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="grossPay"
+                          name="Gross Pay"
+                          stroke="var(--color-accent)"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="netPay"
+                          name="Net Pay"
+                          stroke="var(--color-primary)"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="realNetPay"
+                          name="Real Net Pay"
+                          stroke="#f59e0b"
+                          strokeWidth={2}
+                          strokeDasharray="6 3"
+                          dot={{ r: 2 }}
+                          connectNulls
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* ── 4. Monthly Detail — Detail table ── */}
+                <SectionHeader title="Monthly Detail" />
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                            <th className="px-4 py-3 font-medium">Month</th>
+                            <th className="px-4 py-3 font-medium text-right">
+                              Gross
+                            </th>
+                            <th className="px-4 py-3 font-medium text-right">
+                              Deductions
+                            </th>
+                            <th className="px-4 py-3 font-medium text-right">
+                              Net
+                            </th>
+                            <th className="px-4 py-3 font-medium text-right">
+                              Change
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...state.rows].reverse().map((row, i, arr) => {
+                            const prev =
+                              i < arr.length - 1 ? arr[i + 1].data : null;
+                            const pctChange =
+                              prev && prev.netPay > 0
+                                ? Math.round(
+                                    ((row.data.netPay - prev.netPay) /
+                                      prev.netPay) *
+                                      1000
+                                  ) / 10
+                                : null;
+                            return (
+                              <tr
+                                key={row.payslipDate}
+                                className="border-b border-border last:border-0"
+                              >
+                                <td className="px-4 py-3 font-medium">
+                                  {formatMonth(row.payslipDate)}
+                                </td>
+                                <td className="px-4 py-3 text-right tabular-nums">
+                                  {formatZAR(row.data.grossPay)}
+                                </td>
+                                <td className="px-4 py-3 text-right tabular-nums">
+                                  {formatZAR(row.data.totalDeductions)}
+                                </td>
+                                <td className="px-4 py-3 text-right tabular-nums font-medium">
+                                  {formatZAR(row.data.netPay)}
+                                </td>
+                                <td className="px-4 py-3 text-right tabular-nums">
+                                  {pctChange !== null ? (
+                                    <span
+                                      className={`inline-flex items-center gap-1 ${pctChange > 0 ? "text-green-600" : pctChange < 0 ? "text-red-500" : "text-muted-foreground"}`}
+                                    >
+                                      {pctChange > 0 ? (
+                                        <TrendingUp className="size-3" />
+                                      ) : pctChange < 0 ? (
+                                        <TrendingDown className="size-3" />
+                                      ) : null}
+                                      {pctChange > 0 ? "+" : ""}
+                                      {pctChange}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      —
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* ── 5. Earnings Summary — Totals ── */}
+                <SectionHeader title="Earnings Summary" />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-3">
+                  <Card>
+                    <CardContent className="flex flex-col items-center gap-1 p-4">
+                      <Wallet className="size-4 text-accent" />
+                      <span className="text-lg font-bold text-foreground tabular-nums">
+                        {formatZAR(totals.gross)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">Total Gross</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="flex flex-col items-center gap-1 p-4">
+                      <DollarSign className="size-4 text-green-600" />
+                      <span className="text-lg font-bold text-green-600 tabular-nums">
+                        {formatZAR(totals.net)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">Total Net</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="flex flex-col items-center gap-1 p-4">
+                      <Receipt className="size-4 text-red-500" />
+                      <span className="text-lg font-bold text-red-500 tabular-nums">
+                        {formatZAR(totals.deductions)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">Total Deductions</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="flex flex-col items-center gap-1 p-4">
+                      <BarChart3 className="size-4 text-orange-500" />
+                      <span className="text-lg font-bold text-orange-500 tabular-nums">
+                        {formatZAR(totals.tax)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">Total Tax (PAYE)</span>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* ── 6. Where Your Money Goes — Deductions deep dive ── */}
+                <SectionHeader title="Where Your Money Goes" />
+
+                {/* Deduction details */}
+                <Card className="mb-3">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">Deduction Details</p>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+                      <div>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.uif)}</span>
+                        <p className="text-[11px] text-muted-foreground">UIF</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.pension)}</span>
+                        <p className="text-[11px] text-muted-foreground">Pension</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.medicalAid)}</span>
+                        <p className="text-[11px] text-muted-foreground">Medical Aid</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatZAR(totals.other)}</span>
+                        <p className="text-[11px] text-muted-foreground">Other</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Deduction breakdown chart */}
+                <Card className="mb-3">
+                  <CardContent className="pt-4">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={deductionData}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--color-border)"
+                        />
+                        <XAxis
+                          dataKey="month"
+                          tick={{ fontSize: 12 }}
+                          stroke="var(--color-muted-foreground)"
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12 }}
+                          stroke="var(--color-muted-foreground)"
+                          tickFormatter={(v) =>
+                            `R${(v / 1000).toFixed(0)}k`
+                          }
+                        />
+                        <Tooltip
+                          formatter={(value) => formatZAR(value as number)}
+                          contentStyle={{
+                            backgroundColor: "var(--color-card)",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "8px",
+                            fontSize: "13px",
+                          }}
+                        />
+                        <Legend />
+                        <Bar
+                          dataKey="PAYE"
+                          stackId="deductions"
+                          fill="#ef4444"
+                        />
+                        <Bar
+                          dataKey="UIF"
+                          stackId="deductions"
+                          fill="#f97316"
+                        />
+                        <Bar
+                          dataKey="Pension"
+                          stackId="deductions"
+                          fill="#eab308"
+                        />
+                        <Bar
+                          dataKey="Medical Aid"
+                          stackId="deductions"
+                          fill="#22c55e"
+                        />
+                        <Bar
+                          dataKey="Other"
+                          stackId="deductions"
+                          fill="#6366f1"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Avg Tax Rate + Equiv months */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <Card>
+                    <CardContent className="flex flex-col items-center gap-1 p-4">
+                      <Percent className="size-4 text-accent" />
+                      <span className="text-lg font-bold tabular-nums text-foreground">
+                        {totals.avgTaxRate.toFixed(1)}%
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">Avg Tax Rate</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="flex flex-col items-center gap-1 p-4">
+                      <Clock className="size-4 text-muted-foreground" />
+                      <span className="text-lg font-bold tabular-nums text-foreground">
+                        {totals.equivMonths}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground text-center">Months of net salary in deductions</span>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Contextual insight */}
+                <div className="rounded-xl border border-border bg-card/50 px-4 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    That&apos;s <span className="font-semibold text-foreground">{formatZAR(totals.deductions)}</span> you never saw — equivalent to <span className="font-semibold text-foreground">{totals.equivMonths} months</span> of your average net salary.
+                  </p>
+                </div>
+
+                {/* ── 7. Month-over-Month Change ── */}
+                {momChangeData.length > 0 && (
+                  <>
+                    <SectionHeader title="Month-over-Month Change" />
+                    <Card>
+                      <CardContent className="pt-4">
+                        <ResponsiveContainer width="100%" height={250}>
+                          <BarChart data={momChangeData}>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="var(--color-border)"
+                            />
+                            <XAxis
+                              dataKey="month"
+                              tick={{ fontSize: 12 }}
+                              stroke="var(--color-muted-foreground)"
+                            />
+                            <YAxis
+                              tick={{ fontSize: 12 }}
+                              stroke="var(--color-muted-foreground)"
+                              tickFormatter={(v) => `${v}%`}
+                            />
+                            <Tooltip
+                              formatter={(value) => `${value}%`}
+                              contentStyle={{
+                                backgroundColor: "var(--color-card)",
+                                border: "1px solid var(--color-border)",
+                                borderRadius: "8px",
+                                fontSize: "13px",
+                              }}
+                            />
+                            <Legend />
+                            <Bar
+                              dataKey="Net Pay %"
+                              fill="var(--color-primary)"
+                            />
+                            <Bar
+                              dataKey="Gross Pay %"
+                              fill="var(--color-accent)"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+
+                {/* ── 8. Proof of Income ── */}
+                <SectionHeader title="Proof of Income" id="proof-of-income" />
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (state.step !== "ready") return;
+                          const last3 = state.rows.slice(-3).map((r) => r.payslipDate);
+                          setSelectedMonths(new Set(last3));
+                        }}
+                      >
+                        Last 3
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (state.step !== "ready") return;
+                          setSelectedMonths(new Set(state.rows.map((r) => r.payslipDate)));
+                        }}
+                      >
+                        All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedMonths(new Set())}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {state.rows.map((r) => {
                         const active = selectedMonths.has(r.payslipDate);
                         return (
                           <button
@@ -904,289 +1185,24 @@ export default function InsightsViewer() {
                           </button>
                         );
                       })}
-                  </div>
-                  <Button
-                    onClick={handleGeneratePDF}
-                    disabled={selectedMonths.size === 0}
-                    className="gap-2"
-                  >
-                    <FileDown className="size-4" />
-                    Generate PDF
-                    {selectedMonths.size > 0 && (
-                      <span className="text-xs opacity-70">
-                        ({selectedMonths.size} month{selectedMonths.size !== 1 ? "s" : ""})
-                      </span>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            </section>
-
-            {/* Net Pay trend */}
-            <section className="mb-8">
-              <h2 className="font-heading mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Pay Trend
-              </h2>
-              <Card>
-                <CardContent className="pt-4">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={netPayData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="var(--color-border)"
-                      />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 12 }}
-                        stroke="var(--color-muted-foreground)"
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        stroke="var(--color-muted-foreground)"
-                        tickFormatter={(v) =>
-                          `R${(v / 1000).toFixed(0)}k`
-                        }
-                      />
-                      <Tooltip
-                        formatter={(value) => formatZAR(value as number)}
-                        contentStyle={{
-                          backgroundColor: "var(--color-card)",
-                          border: "1px solid var(--color-border)",
-                          borderRadius: "8px",
-                          fontSize: "13px",
-                        }}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="grossPay"
-                        name="Gross Pay"
-                        stroke="var(--color-accent)"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="netPay"
-                        name="Net Pay"
-                        stroke="var(--color-primary)"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="realNetPay"
-                        name="Real Net Pay"
-                        stroke="#f59e0b"
-                        strokeWidth={2}
-                        strokeDasharray="6 3"
-                        dot={{ r: 2 }}
-                        connectNulls
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </section>
-
-            {/* Deduction breakdown */}
-            <section className="mb-8">
-              <h2 className="font-heading mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Deduction Breakdown
-              </h2>
-              <Card>
-                <CardContent className="pt-4">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={deductionData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="var(--color-border)"
-                      />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 12 }}
-                        stroke="var(--color-muted-foreground)"
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        stroke="var(--color-muted-foreground)"
-                        tickFormatter={(v) =>
-                          `R${(v / 1000).toFixed(0)}k`
-                        }
-                      />
-                      <Tooltip
-                        formatter={(value) => formatZAR(value as number)}
-                        contentStyle={{
-                          backgroundColor: "var(--color-card)",
-                          border: "1px solid var(--color-border)",
-                          borderRadius: "8px",
-                          fontSize: "13px",
-                        }}
-                      />
-                      <Legend />
-                      <Bar
-                        dataKey="PAYE"
-                        stackId="deductions"
-                        fill="#ef4444"
-                      />
-                      <Bar
-                        dataKey="UIF"
-                        stackId="deductions"
-                        fill="#f97316"
-                      />
-                      <Bar
-                        dataKey="Pension"
-                        stackId="deductions"
-                        fill="#eab308"
-                      />
-                      <Bar
-                        dataKey="Medical Aid"
-                        stackId="deductions"
-                        fill="#22c55e"
-                      />
-                      <Bar
-                        dataKey="Other"
-                        stackId="deductions"
-                        fill="#6366f1"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </section>
-
-            {/* Month-over-month changes */}
-            {momChangeData.length > 0 && (
-              <section className="mb-8">
-                <h2 className="font-heading mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                  Month-over-Month Change
-                </h2>
-                <Card>
-                  <CardContent className="pt-4">
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={momChangeData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="var(--color-border)"
-                        />
-                        <XAxis
-                          dataKey="month"
-                          tick={{ fontSize: 12 }}
-                          stroke="var(--color-muted-foreground)"
-                        />
-                        <YAxis
-                          tick={{ fontSize: 12 }}
-                          stroke="var(--color-muted-foreground)"
-                          tickFormatter={(v) => `${v}%`}
-                        />
-                        <Tooltip
-                          formatter={(value) => `${value}%`}
-                          contentStyle={{
-                            backgroundColor: "var(--color-card)",
-                            border: "1px solid var(--color-border)",
-                            borderRadius: "8px",
-                            fontSize: "13px",
-                          }}
-                        />
-                        <Legend />
-                        <Bar
-                          dataKey="Net Pay %"
-                          fill="var(--color-primary)"
-                        />
-                        <Bar
-                          dataKey="Gross Pay %"
-                          fill="var(--color-accent)"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    </div>
+                    <Button
+                      onClick={handleGeneratePDF}
+                      disabled={selectedMonths.size === 0}
+                      className="gap-2"
+                    >
+                      <FileDown className="size-4" />
+                      Generate PDF
+                      {selectedMonths.size > 0 && (
+                        <span className="text-xs opacity-70">
+                          ({selectedMonths.size} month{selectedMonths.size !== 1 ? "s" : ""})
+                        </span>
+                      )}
+                    </Button>
                   </CardContent>
                 </Card>
-              </section>
+              </>
             )}
-
-            {/* Detailed table */}
-            <section>
-              <h2 className="font-heading mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Monthly Detail
-              </h2>
-              <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                          <th className="px-4 py-3 font-medium">Month</th>
-                          <th className="px-4 py-3 font-medium text-right">
-                            Gross
-                          </th>
-                          <th className="px-4 py-3 font-medium text-right">
-                            Deductions
-                          </th>
-                          <th className="px-4 py-3 font-medium text-right">
-                            Net
-                          </th>
-                          <th className="px-4 py-3 font-medium text-right">
-                            Change
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...state.rows].reverse().map((row, i, arr) => {
-                          const prev =
-                            i < arr.length - 1 ? arr[i + 1].data : null;
-                          const pctChange =
-                            prev && prev.netPay > 0
-                              ? Math.round(
-                                  ((row.data.netPay - prev.netPay) /
-                                    prev.netPay) *
-                                    1000
-                                ) / 10
-                              : null;
-                          return (
-                            <tr
-                              key={row.payslipDate}
-                              className="border-b border-border last:border-0"
-                            >
-                              <td className="px-4 py-3 font-medium">
-                                {formatMonth(row.payslipDate)}
-                              </td>
-                              <td className="px-4 py-3 text-right tabular-nums">
-                                {formatZAR(row.data.grossPay)}
-                              </td>
-                              <td className="px-4 py-3 text-right tabular-nums">
-                                {formatZAR(row.data.totalDeductions)}
-                              </td>
-                              <td className="px-4 py-3 text-right tabular-nums font-medium">
-                                {formatZAR(row.data.netPay)}
-                              </td>
-                              <td className="px-4 py-3 text-right tabular-nums">
-                                {pctChange !== null ? (
-                                  <span
-                                    className={`inline-flex items-center gap-1 ${pctChange > 0 ? "text-green-600" : pctChange < 0 ? "text-red-500" : "text-muted-foreground"}`}
-                                  >
-                                    {pctChange > 0 ? (
-                                      <TrendingUp className="size-3" />
-                                    ) : pctChange < 0 ? (
-                                      <TrendingDown className="size-3" />
-                                    ) : null}
-                                    {pctChange > 0 ? "+" : ""}
-                                    {pctChange}%
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">
-                                    —
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
 
             {/* Footer */}
             <div className="mt-10 border-t border-border pt-6 text-center space-y-1">
